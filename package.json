@@ -1,0 +1,43 @@
+{
+  "name": "banking-microservices",
+  "version": "1.0.0",
+  "description": "Banking Microservices",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:customer": "npm run dev --workspace=customer-service",
+    "dev:transaction": "npm run dev --workspace=transaction-service",
+    "build:customer": "npm run build --workspace=customer-service",
+    "build:transaction": "npm run build --workspace=transaction-service",
+    "test:customer": "npm run test --workspace=customer-service",
+    "test:transaction": "npm run test --workspace=transaction-service",
+    "test": "npm run test --workspaces",
+    "lint": "eslint 'packages/*/src/**/*.ts' --fix",
+    "format": "prettier --write 'packages/*/src/**/*.ts'",
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f"
+  },
+  "keywords": [
+    "microservices",
+    "banking",
+    "nodejs",
+    "typescript"
+  ],
+  "author": "Bruno Santos",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.55.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
