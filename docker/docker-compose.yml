@@ -1,0 +1,165 @@
+version: '3.8'
+
+services:
+  postgres-customer:
+    image: postgres:15-alpine
+    container_name: postgres-customer
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_CUSTOMER_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_customer_data:/var/lib/postgresql/data
+      - ./init-scripts/init-clients-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_CUSTOMER_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-transaction:
+    image: postgres:15-alpine
+    container_name: postgres-transaction
+    env_file:
+      - ../.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_TRANSACTION_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_transaction_data:/var/lib/postgresql/data
+      - ./init-scripts/init-transaction-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_TRANSACTION_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: banking-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: rabbitmq
+    env_file:
+      - ../.env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  customer-service:
+    build:
+      context: ../packages/customer-service
+      dockerfile: Dockerfile
+    container_name: banking-customer-service
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${CUSTOMER_SERVICE_PORT}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-customer:5432/${POSTGRES_CUSTOMER_DB}
+      REDIS_URL: redis://banking-redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/${RABBITMQ_VHOST}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+    ports:
+      - "${CUSTOMER_SERVICE_PORT}:${CUSTOMER_SERVICE_PORT}"
+    depends_on:
+      postgres-customer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - banking-network
+    volumes:
+      - ../packages/customer-service:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  transaction-service:
+    build:
+      context: ../packages/transaction-service
+      dockerfile: Dockerfile
+    container_name: banking-transaction-service
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${TRANSACTION_SERVICE_PORT}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-transaction:5432/${POSTGRES_TRANSACTION_DB}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/${RABBITMQ_VHOST}
+      CUSTOMER_SERVICE_URL: http://customer-service:${CUSTOMER_SERVICE_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+    ports:
+      - "${TRANSACTION_SERVICE_PORT}:${TRANSACTION_SERVICE_PORT}"
+    depends_on:
+      postgres-transaction:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      customer-service:
+        condition: service_started
+    networks:
+      - banking-network
+    volumes:
+      - ../packages/transaction-service:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+networks:
+  banking-network:
+    driver: bridge
+    name: banking-network
+
+volumes:
+  postgres_customer_data:
+    name: banking-postgres-customer-data
+  postgres_transaction_data:
+    name: banking-postgres-transaction-data
+  redis_data:
+    name: banking-redis-data
+  rabbitmq_data:
+    name: banking-rabbitmq-data
