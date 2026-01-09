@@ -37,3 +37,9 @@ export interface JwtPayload {
   iat?: number;
   exp?: number;
 }
+
+export interface RequestData {
+  body?: unknown;
+  query?: unknown;
+  params?: unknown;
+}

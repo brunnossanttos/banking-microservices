@@ -1,14 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { ZodSchema, ZodError } from 'zod';
+import { ZodType, ZodError } from 'zod';
 import { StatusCodes } from 'http-status-codes';
+import { RequestData } from '../types';
 
-interface RequestData {
-  body: unknown;
-  query: unknown;
-  params: unknown;
-}
-
-export function validateRequest(schema: ZodSchema<RequestData>) {
+export function validateRequest<T extends RequestData>(schema: ZodType<T>) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       await schema.parseAsync({
