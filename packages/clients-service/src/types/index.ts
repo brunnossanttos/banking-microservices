@@ -1,23 +1,15 @@
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
-  timestamp: string;
-}
-
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+export {
+  ApiResponse,
+  PaginatedResponse,
+  HealthData,
+  JwtPayload,
+  PaginationParams,
+} from '@banking/shared';
 
 export interface User {
   id: string;
   email: string;
+  password?: string;
   name: string;
   cpf: string;
   address?: Address;
@@ -49,8 +41,29 @@ export interface BankingDetails {
 export type AccountType = 'checking' | 'savings';
 export type UserStatus = 'active' | 'inactive' | 'blocked' | 'pending_verification';
 
-export interface HealthData {
-  status: string;
-  uptime: number;
-  timestamp: string;
+export interface CreateUserDto {
+  email: string;
+  password: string;
+  name: string;
+  cpf: string;
+  address?: Address;
+  bankingDetails: BankingDetails;
+}
+
+export interface UpdateUserDto {
+  name?: string;
+  email?: string;
+  address?: Address;
+  bankingDetails?: Partial<BankingDetails>;
+}
+
+export interface LoginDto {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  user: Omit<User, 'password'>;
+  accessToken: string;
+  refreshToken?: string;
 }

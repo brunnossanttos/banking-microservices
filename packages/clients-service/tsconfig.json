@@ -4,7 +4,6 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -23,8 +22,11 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "composite": true,
     "baseUrl": "./src",
     "paths": {
+      "@banking/shared": ["../../shared/src"],
+      "@banking/shared/*": ["../../shared/src/*"],
       "@config/*": ["config/*"],
       "@controllers/*": ["controllers/*"],
       "@services/*": ["services/*"],
@@ -38,5 +40,8 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"],
+  "references": [
+    { "path": "../shared" }
+  ]
 }

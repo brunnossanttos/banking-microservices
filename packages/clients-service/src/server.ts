@@ -1,6 +1,17 @@
+import http from 'http';
 import { createApp } from './app';
-import { env, connectDatabase, connectRedis, connectRabbitMQ } from './config';
+import {
+  env,
+  connectDatabase,
+  disconnectDatabase,
+  connectRedis,
+  disconnectRedis,
+  connectRabbitMQ,
+  disconnectRabbitMQ,
+} from './config';
 import { logger } from './utils';
+
+let server: http.Server | null = null;
 
 async function connectServices(): Promise<void> {
   const connectionPromises: Promise<void>[] = [];
@@ -28,17 +39,49 @@ async function connectServices(): Promise<void> {
   await Promise.all(connectionPromises);
 }
 
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info(`${signal} received. Starting graceful shutdown...`);
+
+  if (server) {
+    server.close(() => {
+      logger.info('HTTP server closed');
+    });
+  }
+
+  try {
+    await Promise.allSettled([
+      disconnectDatabase().catch(err => {
+        logger.error('Error disconnecting database', err);
+      }),
+      disconnectRedis().catch(err => {
+        logger.error('Error disconnecting Redis', err);
+      }),
+      disconnectRabbitMQ().catch(err => {
+        logger.error('Error disconnecting RabbitMQ', err);
+      }),
+    ]);
+
+    logger.info('All connections closed. Exiting...');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown', error);
+    process.exit(1);
+  }
+}
+
 async function bootstrap(): Promise<void> {
   await connectServices();
 
   const app = createApp();
 
-  app.listen(env.port, () => {
+  server = app.listen(env.port, () => {
     logger.info(`Clients Service started on port ${env.port}`);
     logger.info(`Environment: ${env.nodeEnv}`);
     logger.info(`Health check: http://localhost:${env.port}/api/health`);
-    logger.info(`Hello World: http://localhost:${env.port}/api/hello`);
   });
+
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 }
 
 bootstrap().catch(error => {
@@ -47,11 +90,18 @@ bootstrap().catch(error => {
 });
 
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM received. Shutting down gracefully...');
-  process.exit(0);
+  void gracefulShutdown('SIGTERM');
 });
 
 process.on('SIGINT', () => {
-  logger.info('SIGINT received. Shutting down gracefully...');
-  process.exit(0);
+  void gracefulShutdown('SIGINT');
+});
+
+process.on('uncaughtException', error => {
+  logger.error('Uncaught Exception', error);
+  void gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection', { reason, promise });
 });
