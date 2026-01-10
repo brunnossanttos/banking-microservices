@@ -1,38 +1,5 @@
 import { getPool } from '../config/database';
-import { User, Address, BankingDetails } from '../types';
-
-export interface CreateUserData {
-  email: string;
-  passwordHash: string;
-  name: string;
-  cpf: string;
-  address?: Address;
-  bankingDetails: Omit<BankingDetails, 'balance'>;
-}
-
-interface UserRow {
-  id: string;
-  email: string;
-  password_hash: string;
-  name: string;
-  cpf: string;
-  address_street: string | null;
-  address_number: string | null;
-  address_complement: string | null;
-  address_neighborhood: string | null;
-  address_city: string | null;
-  address_state: string | null;
-  address_zip_code: string | null;
-  banking_agency: string;
-  banking_account: string;
-  banking_account_type: 'checking' | 'savings';
-  balance: string;
-  profile_picture_url: string | null;
-  status: 'active' | 'inactive' | 'blocked' | 'pending_verification';
-  email_verified: boolean;
-  created_at: Date;
-  updated_at: Date;
-}
+import { CreateUserData, UpdateUserData, User, UserRow } from '../types';
 
 function mapRowToUser(row: UserRow): Omit<User, 'password'> {
   return {
@@ -166,4 +133,52 @@ export async function findById(id: string): Promise<Omit<User, 'password'> | nul
   }
 
   return mapRowToUser(result.rows[0]);
+}
+
+export async function updateUser(id: string, data: UpdateUserData): Promise<boolean> {
+  const pool = getPool();
+
+  const updates: string[] = [];
+  const values: unknown[] = [];
+  let paramIndex = 1;
+
+  if (data.name !== undefined) {
+    updates.push(`name = $${paramIndex++}`);
+    values.push(data.name);
+  }
+
+  if (data.email !== undefined) {
+    updates.push(`email = $${paramIndex++}`);
+    values.push(data.email);
+  }
+
+  if (data.bankingDetails?.agency !== undefined) {
+    updates.push(`banking_agency = $${paramIndex++}`);
+    values.push(data.bankingDetails.agency);
+  }
+
+  if (data.bankingDetails?.account !== undefined) {
+    updates.push(`banking_account = $${paramIndex++}`);
+    values.push(data.bankingDetails.account);
+  }
+
+  if (data.bankingDetails?.accountType !== undefined) {
+    updates.push(`banking_account_type = $${paramIndex++}`);
+    values.push(data.bankingDetails.accountType);
+  }
+
+  if (updates.length === 0) {
+    return false;
+  }
+
+  values.push(id);
+
+  const query = `
+    UPDATE users
+    SET ${updates.join(', ')}
+    WHERE id = $${paramIndex} AND deleted_at IS NULL
+  `;
+
+  const result = await pool.query(query, values);
+  return result.rowCount !== null && result.rowCount > 0;
 }
