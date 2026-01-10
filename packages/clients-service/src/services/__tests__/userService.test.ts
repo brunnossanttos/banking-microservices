@@ -125,4 +125,47 @@ describe('userService', () => {
       expect(mockedRepository.findByBankingDetails).not.toHaveBeenCalled();
     });
   });
+
+  describe('getUserById', () => {
+    const existingUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 1000,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should return user when found', async () => {
+      mockedRepository.findById.mockResolvedValue(existingUser);
+
+      const result = await userService.getUserById('uuid-123');
+
+      expect(result).toEqual(existingUser);
+      expect(mockedRepository.findById).toHaveBeenCalledWith('uuid-123');
+    });
+
+    it('should throw not found error when user does not exist', async () => {
+      mockedRepository.findById.mockResolvedValue(null);
+
+      await expect(userService.getUserById('non-existent-id')).rejects.toThrow(AppError);
+      await expect(userService.getUserById('non-existent-id')).rejects.toMatchObject({
+        statusCode: 404,
+        message: 'User not found',
+      });
+    });
+  });
 });

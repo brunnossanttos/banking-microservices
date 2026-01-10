@@ -6,6 +6,7 @@ import { userService } from '../../services';
 jest.mock('../../services', () => ({
   userService: {
     createUser: jest.fn(),
+    getUserById: jest.fn(),
   },
 }));
 
@@ -103,6 +104,62 @@ describe('userController', () => {
       mockedUserService.createUser.mockRejectedValue(error);
 
       await userController.create(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+      expect(mockRes.status).not.toHaveBeenCalled();
+      expect(mockRes.json).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getById', () => {
+    const existingUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 1000,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should return user and 200 status', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockedUserService.getUserById.mockResolvedValue(existingUser);
+
+      await userController.getById(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockedUserService.getUserById).toHaveBeenCalledWith('uuid-123');
+      expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: existingUser,
+        timestamp: expect.any(String),
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should call next with error when service throws', async () => {
+      mockReq.params = { userId: 'non-existent-id' };
+      const error = new Error('User not found');
+      mockedUserService.getUserById.mockRejectedValue(error);
+
+      await userController.getById(
         mockReq as Request,
         mockRes as Response,
         mockNext,

@@ -184,3 +184,95 @@ describe('POST /api/users', () => {
     expect(result.rows[0].cpf).toBe('12345678900');
   });
 });
+
+describe('GET /api/users/:userId', () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+  });
+
+  const createValidInput = () => ({
+    email: generateTestEmail(),
+    password: 'password123',
+    name: 'Integration Test User',
+    cpf: generateTestCpf(),
+    bankingDetails: {
+      agency: '0001',
+      account: `${Date.now()}`,
+      accountType: 'checking',
+    },
+  });
+
+  it('should return user data when user exists', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        id: userId,
+        email: input.email,
+        name: input.name,
+        cpf: input.cpf.replace(/\D/g, ''),
+        bankingDetails: {
+          agency: input.bankingDetails.agency,
+          account: input.bankingDetails.account,
+          accountType: input.bankingDetails.accountType,
+          balance: 0,
+        },
+      },
+    });
+    expect(response.body.timestamp).toBeDefined();
+  });
+
+  it('should return 404 when user does not exist', async () => {
+    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+
+    const response = await request(app)
+      .get(`/api/users/${nonExistentId}`)
+      .expect(404);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'User not found',
+    });
+  });
+
+  it('should return 400 for invalid UUID format', async () => {
+    const response = await request(app)
+      .get('/api/users/invalid-uuid')
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'params.userId' }),
+    );
+  });
+
+  it('should not return password in response', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(response.body.data.password).toBeUndefined();
+    expect(response.body.data.passwordHash).toBeUndefined();
+  });
+});
