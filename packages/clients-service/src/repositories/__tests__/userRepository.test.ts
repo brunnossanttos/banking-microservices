@@ -193,6 +193,28 @@ describe('userRepository', () => {
     });
   });
 
+  describe('findById', () => {
+    it('should return user when found', async () => {
+      mockQuery.mockResolvedValue({ rows: [mockUserRow] });
+
+      const result = await userRepository.findById('uuid-123');
+
+      expect(result).toEqual(expectedUser);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE id = $1'),
+        ['uuid-123'],
+      );
+    });
+
+    it('should return null when user not found', async () => {
+      mockQuery.mockResolvedValue({ rows: [] });
+
+      const result = await userRepository.findById('non-existent-id');
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('mapRowToUser (via createUser)', () => {
     it('should convert null fields to undefined', async () => {
       const rowWithNulls = {

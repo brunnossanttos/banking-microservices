@@ -44,3 +44,13 @@ export async function createUser(input: CreateUserInput): Promise<Omit<User, 'pa
 
   return user;
 }
+
+export async function getUserById(id: string): Promise<Omit<User, 'password'>> {
+  const user = await userRepository.findById(id);
+
+  if (!user) {
+    throw AppError.notFound('User not found');
+  }
+
+  return user;
+}

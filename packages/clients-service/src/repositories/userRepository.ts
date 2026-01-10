@@ -150,3 +150,20 @@ export async function findByBankingDetails(
 
   return mapRowToUser(result.rows[0]);
 }
+
+export async function findById(id: string): Promise<Omit<User, 'password'> | null> {
+  const pool = getPool();
+
+  const query = `
+    SELECT * FROM users
+    WHERE id = $1 AND deleted_at IS NULL
+  `;
+
+  const result = await pool.query<UserRow>(query, [id]);
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return mapRowToUser(result.rows[0]);
+}
