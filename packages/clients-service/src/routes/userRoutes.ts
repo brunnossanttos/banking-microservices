@@ -1,7 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { userController } from '../controllers';
 import { validateRequest } from '@banking/shared';
-import { createUserSchema, getUserSchema, updateUserSchema } from '../schemas/userSchema';
+import {
+  createUserSchema,
+  getUserSchema,
+  updateUserSchema,
+  updateProfilePictureSchema,
+} from '../schemas/userSchema';
 
 const router = Router();
 
@@ -32,6 +37,16 @@ router.patch(
   },
   (req: Request, res: Response, next: NextFunction) => {
     void userController.update(req, res, next);
+  },
+);
+
+router.patch(
+  '/:userId/profile-picture',
+  (req: Request, res: Response, next: NextFunction) => {
+    void validateRequest(updateProfilePictureSchema)(req, res, next);
+  },
+  (req: Request, res: Response, next: NextFunction) => {
+    void userController.updateProfilePicture(req, res, next);
   },
 );
 

@@ -265,4 +265,55 @@ describe('userService', () => {
       expect(mockedRepository.updateUser).toHaveBeenCalled();
     });
   });
+
+  describe('updateProfilePicture', () => {
+    const existingUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 1000,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockedRepository.findById.mockResolvedValue(existingUser);
+      mockedRepository.updateProfilePicture.mockResolvedValue(true);
+    });
+
+    it('should update profile picture successfully', async () => {
+      await userService.updateProfilePicture('uuid-123', 'https://example.com/photo.jpg');
+
+      expect(mockedRepository.findById).toHaveBeenCalledWith('uuid-123');
+      expect(mockedRepository.updateProfilePicture).toHaveBeenCalledWith(
+        'uuid-123',
+        'https://example.com/photo.jpg',
+      );
+    });
+
+    it('should throw not found error when user does not exist', async () => {
+      mockedRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        userService.updateProfilePicture('non-existent-id', 'https://example.com/photo.jpg'),
+      ).rejects.toThrow(AppError);
+      await expect(
+        userService.updateProfilePicture('non-existent-id', 'https://example.com/photo.jpg'),
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        message: 'User not found',
+      });
+      expect(mockedRepository.updateProfilePicture).not.toHaveBeenCalled();
+    });
+  });
 });

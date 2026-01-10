@@ -494,3 +494,116 @@ describe('PATCH /api/users/:userId', () => {
     );
   });
 });
+
+describe('PATCH /api/users/:userId/profile-picture', () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+  });
+
+  const createValidInput = () => ({
+    email: generateTestEmail(),
+    password: 'password123',
+    name: 'Integration Test User',
+    cpf: generateTestCpf(),
+    bankingDetails: {
+      agency: '0001',
+      account: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      accountType: 'checking',
+    },
+  });
+
+  it('should update profile picture successfully', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+    const profilePictureUrl = 'https://example.com/photo.jpg';
+
+    const response = await request(app)
+      .patch(`/api/users/${userId}/profile-picture`)
+      .send({ profilePictureUrl })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      message: 'Profile picture updated successfully',
+    });
+    expect(response.body.timestamp).toBeDefined();
+
+    // Verify the update persisted
+    const getResponse = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(getResponse.body.data.profilePictureUrl).toBe(profilePictureUrl);
+  });
+
+  it('should return 404 when user does not exist', async () => {
+    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+
+    const response = await request(app)
+      .patch(`/api/users/${nonExistentId}/profile-picture`)
+      .send({ profilePictureUrl: 'https://example.com/photo.jpg' })
+      .expect(404);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'User not found',
+    });
+  });
+
+  it('should return 400 for invalid UUID format', async () => {
+    const response = await request(app)
+      .patch('/api/users/invalid-uuid/profile-picture')
+      .send({ profilePictureUrl: 'https://example.com/photo.jpg' })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'params.userId' }),
+    );
+  });
+
+  it('should return 400 for invalid URL format', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .patch(`/api/users/${userId}/profile-picture`)
+      .send({ profilePictureUrl: 'not-a-valid-url' })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'body.profilePictureUrl' }),
+    );
+  });
+
+  it('should return 400 when profilePictureUrl is missing', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .patch(`/api/users/${userId}/profile-picture`)
+      .send({})
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+});

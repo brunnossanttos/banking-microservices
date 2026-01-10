@@ -182,3 +182,16 @@ export async function updateUser(id: string, data: UpdateUserData): Promise<bool
   const result = await pool.query(query, values);
   return result.rowCount !== null && result.rowCount > 0;
 }
+
+export async function updateProfilePicture(id: string, profilePictureUrl: string): Promise<boolean> {
+  const pool = getPool();
+
+  const query = `
+    UPDATE users
+    SET profile_picture_url = $1
+    WHERE id = $2 AND deleted_at IS NULL
+  `;
+
+  const result = await pool.query(query, [profilePictureUrl, id]);
+  return result.rowCount !== null && result.rowCount > 0;
+}

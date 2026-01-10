@@ -90,3 +90,13 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<vo
     bankingDetails: input.bankingDetails,
   });
 }
+
+export async function updateProfilePicture(id: string, profilePictureUrl: string): Promise<void> {
+  const user = await userRepository.findById(id);
+
+  if (!user) {
+    throw AppError.notFound('User not found');
+  }
+
+  await userRepository.updateProfilePicture(id, profilePictureUrl);
+}

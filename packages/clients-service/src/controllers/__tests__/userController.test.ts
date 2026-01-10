@@ -8,6 +8,7 @@ jest.mock('../../services', () => ({
     createUser: jest.fn(),
     getUserById: jest.fn(),
     updateUser: jest.fn(),
+    updateProfilePicture: jest.fn(),
   },
 }));
 
@@ -201,6 +202,49 @@ describe('userController', () => {
       mockedUserService.updateUser.mockRejectedValue(error);
 
       await userController.update(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+      expect(mockRes.status).not.toHaveBeenCalled();
+      expect(mockRes.json).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateProfilePicture', () => {
+    it('should update profile picture and return 200 with success message', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { profilePictureUrl: 'https://example.com/photo.jpg' };
+      mockedUserService.updateProfilePicture.mockResolvedValue(undefined);
+
+      await userController.updateProfilePicture(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockedUserService.updateProfilePicture).toHaveBeenCalledWith(
+        'uuid-123',
+        'https://example.com/photo.jpg',
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Profile picture updated successfully',
+        timestamp: expect.any(String),
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should call next with error when service throws', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { profilePictureUrl: 'https://example.com/photo.jpg' };
+      const error = new Error('Update failed');
+      mockedUserService.updateProfilePicture.mockRejectedValue(error);
+
+      await userController.updateProfilePicture(
         mockReq as Request,
         mockRes as Response,
         mockNext,

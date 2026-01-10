@@ -6,6 +6,7 @@ import {
   GetUserParams,
   UpdateUserInput,
   UpdateUserParams,
+  UpdateProfilePictureInput,
 } from '../schemas/userSchema';
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -49,6 +50,27 @@ export async function update(req: Request, res: Response, next: NextFunction): P
     res.status(StatusCodes.OK).json({
       success: true,
       message: 'User updated successfully',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateProfilePicture(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req.params as unknown as UpdateUserParams;
+    const { profilePictureUrl } = req.body as UpdateProfilePictureInput;
+
+    await userService.updateProfilePicture(userId, profilePictureUrl);
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Profile picture updated successfully',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

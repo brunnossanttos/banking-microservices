@@ -324,4 +324,32 @@ describe('userRepository', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('updateProfilePicture', () => {
+    it('should update profile picture and return true', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 1 });
+
+      const result = await userRepository.updateProfilePicture(
+        'uuid-123',
+        'https://example.com/new-photo.jpg',
+      );
+
+      expect(result).toBe(true);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE users'),
+        ['https://example.com/new-photo.jpg', 'uuid-123'],
+      );
+    });
+
+    it('should return false when user not found', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 0 });
+
+      const result = await userRepository.updateProfilePicture(
+        'non-existent-id',
+        'https://example.com/photo.jpg',
+      );
+
+      expect(result).toBe(false);
+    });
+  });
 });
