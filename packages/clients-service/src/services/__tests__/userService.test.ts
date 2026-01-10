@@ -168,4 +168,101 @@ describe('userService', () => {
       });
     });
   });
+
+  describe('updateUser', () => {
+    const existingUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 1000,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockedRepository.findById.mockResolvedValue(existingUser);
+      mockedRepository.updateUser.mockResolvedValue(true);
+    });
+
+    it('should update user successfully', async () => {
+      await userService.updateUser('uuid-123', { name: 'New Name' });
+
+      expect(mockedRepository.updateUser).toHaveBeenCalledWith('uuid-123', {
+        name: 'New Name',
+        email: undefined,
+        bankingDetails: undefined,
+      });
+    });
+
+    it('should throw not found error when user does not exist', async () => {
+      mockedRepository.findById.mockResolvedValue(null);
+
+      await expect(userService.updateUser('non-existent-id', { name: 'New Name' })).rejects.toThrow(AppError);
+      await expect(userService.updateUser('non-existent-id', { name: 'New Name' })).rejects.toMatchObject({
+        statusCode: 404,
+        message: 'User not found',
+      });
+    });
+
+    it('should throw conflict error when new email already exists', async () => {
+      mockedRepository.findByEmail.mockResolvedValue({ ...existingUser, id: 'other-id' });
+
+      await expect(userService.updateUser('uuid-123', { email: 'taken@example.com' })).rejects.toThrow(AppError);
+      await expect(userService.updateUser('uuid-123', { email: 'taken@example.com' })).rejects.toMatchObject({
+        statusCode: 409,
+        message: 'Email already registered',
+      });
+      expect(mockedRepository.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('should not check email uniqueness when email unchanged', async () => {
+      await userService.updateUser('uuid-123', { email: 'test@example.com' });
+
+      expect(mockedRepository.findByEmail).not.toHaveBeenCalled();
+      expect(mockedRepository.updateUser).toHaveBeenCalled();
+    });
+
+    it('should throw conflict error when new banking details already exist', async () => {
+      mockedRepository.findByBankingDetails.mockResolvedValue({ ...existingUser, id: 'other-id' });
+
+      await expect(
+        userService.updateUser('uuid-123', { bankingDetails: { agency: '0002', account: '99999-9' } }),
+      ).rejects.toThrow(AppError);
+      await expect(
+        userService.updateUser('uuid-123', { bankingDetails: { agency: '0002', account: '99999-9' } }),
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message: 'Banking details already in use',
+      });
+    });
+
+    it('should not check banking uniqueness when banking details unchanged', async () => {
+      await userService.updateUser('uuid-123', {
+        bankingDetails: { agency: '0001', account: '12345-6' },
+      });
+
+      expect(mockedRepository.findByBankingDetails).not.toHaveBeenCalled();
+      expect(mockedRepository.updateUser).toHaveBeenCalled();
+    });
+
+    it('should allow same user to keep their own banking details', async () => {
+      mockedRepository.findByBankingDetails.mockResolvedValue(existingUser);
+
+      await userService.updateUser('uuid-123', {
+        bankingDetails: { agency: '0002' },
+      });
+
+      expect(mockedRepository.updateUser).toHaveBeenCalled();
+    });
+  });
 });

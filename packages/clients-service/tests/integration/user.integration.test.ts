@@ -172,7 +172,9 @@ describe('POST /api/users', () => {
   });
 
   it('should sanitize CPF before storing', async () => {
-    const input = { ...createValidInput(), cpf: '123.456.789-00' };
+    const rawCpf = generateTestCpf();
+    const formattedCpf = `${rawCpf.slice(0, 3)}.${rawCpf.slice(3, 6)}.${rawCpf.slice(6, 9)}-${rawCpf.slice(9, 11)}`;
+    const input = { ...createValidInput(), cpf: formattedCpf };
 
     await request(app)
       .post('/api/users')
@@ -181,7 +183,7 @@ describe('POST /api/users', () => {
 
     const pool = getPool();
     const result = await pool.query('SELECT cpf FROM users WHERE email = $1', [input.email]);
-    expect(result.rows[0].cpf).toBe('12345678900');
+    expect(result.rows[0].cpf).toBe(rawCpf);
   });
 });
 
@@ -274,5 +276,221 @@ describe('GET /api/users/:userId', () => {
 
     expect(response.body.data.password).toBeUndefined();
     expect(response.body.data.passwordHash).toBeUndefined();
+  });
+});
+
+describe('PATCH /api/users/:userId', () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+  });
+
+  const createValidInput = () => ({
+    email: generateTestEmail(),
+    password: 'password123',
+    name: 'Integration Test User',
+    cpf: generateTestCpf(),
+    bankingDetails: {
+      agency: '0001',
+      account: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      accountType: 'checking',
+    },
+  });
+
+  it('should update user name successfully', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .patch(`/api/users/${userId}`)
+      .send({ name: 'Updated Name' })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      message: 'User updated successfully',
+    });
+    expect(response.body.timestamp).toBeDefined();
+
+    const getResponse = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(getResponse.body.data.name).toBe('Updated Name');
+  });
+
+  it('should update user email successfully', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+    const newEmail = generateTestEmail();
+
+    await request(app)
+      .patch(`/api/users/${userId}`)
+      .send({ email: newEmail })
+      .expect(200);
+
+    const getResponse = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(getResponse.body.data.email).toBe(newEmail);
+  });
+
+  it('should update banking details successfully', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    await request(app)
+      .patch(`/api/users/${userId}`)
+      .send({ bankingDetails: { agency: '0002' } })
+      .expect(200);
+
+    const getResponse = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(getResponse.body.data.bankingDetails.agency).toBe('0002');
+    expect(getResponse.body.data.bankingDetails.account).toBe(input.bankingDetails.account);
+  });
+
+  it('should return 404 when user does not exist', async () => {
+    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+
+    const response = await request(app)
+      .patch(`/api/users/${nonExistentId}`)
+      .send({ name: 'New Name' })
+      .expect(404);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'User not found',
+    });
+  });
+
+  it('should return 409 when email already exists', async () => {
+    const input1 = createValidInput();
+    const input2 = createValidInput();
+
+    await request(app)
+      .post('/api/users')
+      .send(input1)
+      .expect(201);
+
+    const createResponse2 = await request(app)
+      .post('/api/users')
+      .send(input2)
+      .expect(201);
+
+    const userId2 = createResponse2.body.data.id;
+
+    const response = await request(app)
+      .patch(`/api/users/${userId2}`)
+      .send({ email: input1.email })
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'Email already registered',
+    });
+  });
+
+  it('should return 409 when banking details already exist', async () => {
+    const input1 = createValidInput();
+    const input2 = createValidInput();
+
+    await request(app)
+      .post('/api/users')
+      .send(input1)
+      .expect(201);
+
+    const createResponse2 = await request(app)
+      .post('/api/users')
+      .send(input2)
+      .expect(201);
+
+    const userId2 = createResponse2.body.data.id;
+
+    const response = await request(app)
+      .patch(`/api/users/${userId2}`)
+      .send({
+        bankingDetails: {
+          agency: input1.bankingDetails.agency,
+          account: input1.bankingDetails.account,
+        },
+      })
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'Banking details already in use',
+    });
+  });
+
+  it('should return 400 for invalid UUID format', async () => {
+    const response = await request(app)
+      .patch('/api/users/invalid-uuid')
+      .send({ name: 'New Name' })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'params.userId' }),
+    );
+  });
+
+  it('should return 400 when no fields provided', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .patch(`/api/users/${userId}`)
+      .send({})
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should return 400 for invalid email format', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .patch(`/api/users/${userId}`)
+      .send({ email: 'invalid-email' })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'body.email' }),
+    );
   });
 });

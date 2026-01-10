@@ -254,4 +254,74 @@ describe('userRepository', () => {
       expect(typeof result?.bankingDetails.balance).toBe('number');
     });
   });
+
+  describe('updateUser', () => {
+    it('should update name only', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 1 });
+
+      const result = await userRepository.updateUser('uuid-123', { name: 'New Name' });
+
+      expect(result).toBe(true);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE users'),
+        ['New Name', 'uuid-123'],
+      );
+    });
+
+    it('should update email only', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 1 });
+
+      const result = await userRepository.updateUser('uuid-123', { email: 'new@example.com' });
+
+      expect(result).toBe(true);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('email = $1'),
+        ['new@example.com', 'uuid-123'],
+      );
+    });
+
+    it('should update banking details', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 1 });
+
+      const result = await userRepository.updateUser('uuid-123', {
+        bankingDetails: { agency: '0002', account: '99999-9' },
+      });
+
+      expect(result).toBe(true);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('banking_agency'),
+        expect.arrayContaining(['0002', '99999-9']),
+      );
+    });
+
+    it('should update multiple fields', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 1 });
+
+      const result = await userRepository.updateUser('uuid-123', {
+        name: 'New Name',
+        email: 'new@example.com',
+      });
+
+      expect(result).toBe(true);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringMatching(/name = \$1.*email = \$2/s),
+        ['New Name', 'new@example.com', 'uuid-123'],
+      );
+    });
+
+    it('should return false when no fields to update', async () => {
+      const result = await userRepository.updateUser('uuid-123', {});
+
+      expect(result).toBe(false);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('should return false when user not found', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 0 });
+
+      const result = await userRepository.updateUser('non-existent-id', { name: 'New Name' });
+
+      expect(result).toBe(false);
+    });
+  });
 });

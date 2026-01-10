@@ -7,6 +7,7 @@ jest.mock('../../services', () => ({
   userService: {
     createUser: jest.fn(),
     getUserById: jest.fn(),
+    updateUser: jest.fn(),
   },
 }));
 
@@ -160,6 +161,46 @@ describe('userController', () => {
       mockedUserService.getUserById.mockRejectedValue(error);
 
       await userController.getById(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+      expect(mockRes.status).not.toHaveBeenCalled();
+      expect(mockRes.json).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it('should update user and return 200 with success message', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { name: 'New Name' };
+      mockedUserService.updateUser.mockResolvedValue(undefined);
+
+      await userController.update(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockedUserService.updateUser).toHaveBeenCalledWith('uuid-123', { name: 'New Name' });
+      expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'User updated successfully',
+        timestamp: expect.any(String),
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should call next with error when service throws', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { name: 'New Name' };
+      const error = new Error('Update failed');
+      mockedUserService.updateUser.mockRejectedValue(error);
+
+      await userController.update(
         mockReq as Request,
         mockRes as Response,
         mockNext,
