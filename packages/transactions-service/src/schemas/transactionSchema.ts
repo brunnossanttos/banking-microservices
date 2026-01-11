@@ -23,28 +23,12 @@ export const getUserTransactionsSchema = z.object({
     userId: z.string().uuid('Invalid user ID format'),
   }),
   query: z.object({
-    page: z
-      .string()
-      .optional()
-      .transform(val => (val ? parseInt(val, 10) : 1))
-      .pipe(z.number().min(1)),
-    limit: z
-      .string()
-      .optional()
-      .transform(val => (val ? parseInt(val, 10) : 10))
-      .pipe(z.number().min(1).max(100)),
+    page: z.string().regex(/^\d+$/, 'Page must be a number').optional(),
+    limit: z.string().regex(/^\d+$/, 'Limit must be a number').optional(),
     status: z.enum(['pending', 'processing', 'completed', 'failed', 'reversed']).optional(),
     type: z.enum(['transfer', 'deposit', 'withdrawal']).optional(),
-    startDate: z
-      .string()
-      .datetime()
-      .optional()
-      .transform(val => (val ? new Date(val) : undefined)),
-    endDate: z
-      .string()
-      .datetime()
-      .optional()
-      .transform(val => (val ? new Date(val) : undefined)),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
   }),
 });
 
