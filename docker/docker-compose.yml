@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres-customer:
     image: postgres:15-alpine
@@ -11,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_CUSTOMER_DB}
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_customer_data:/var/lib/postgresql/data
       - ./init-scripts/init-clients-db.sql:/docker-entrypoint-initdb.d/01-init.sql
@@ -34,7 +32,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_TRANSACTION_DB}
     ports:
-      - "5433:5432"
+      - "5435:5432"
     volumes:
       - postgres_transaction_data:/var/lib/postgresql/data
       - ./init-scripts/init-transaction-db.sql:/docker-entrypoint-initdb.d/01-init.sql
@@ -87,23 +85,32 @@ services:
       retries: 5
     restart: unless-stopped
 
-  customer-service:
+  clients-service:
     build:
-      context: ../packages/customer-service
+      context: ../packages/clients-service
       dockerfile: Dockerfile
-    container_name: banking-customer-service
+    container_name: banking-clients-service
     env_file:
       - ../.env
     environment:
       NODE_ENV: ${NODE_ENV}
-      PORT: ${CUSTOMER_SERVICE_PORT}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-customer:5432/${POSTGRES_CUSTOMER_DB}
-      REDIS_URL: redis://banking-redis:6379
-      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/${RABBITMQ_VHOST}
+      PORT: ${CLIENTS_SERVICE_PORT}
+      DB_HOST: postgres-customer
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_CUSTOMER_DB}
+      REDIS_HOST: banking-redis
+      REDIS_PORT: 6379
+      RABBIT_HOST: rabbitmq
+      RABBIT_PORT: 5672
+      RABBIT_USER: ${RABBITMQ_USER}
+      RABBIT_PASS: ${RABBITMQ_PASSWORD}
+      RABBIT_VHOST: ${RABBITMQ_VHOST}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
     ports:
-      - "${CUSTOMER_SERVICE_PORT}:${CUSTOMER_SERVICE_PORT}"
+      - "${CLIENTS_SERVICE_PORT}:${CLIENTS_SERVICE_PORT}"
     depends_on:
       postgres-customer:
         condition: service_healthy
@@ -114,7 +121,7 @@ services:
     networks:
       - banking-network
     volumes:
-      - ../packages/customer-service:/app
+      - ../packages/clients-service:/app
       - /app/node_modules
     restart: unless-stopped
 
@@ -130,7 +137,7 @@ services:
       PORT: ${TRANSACTION_SERVICE_PORT}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-transaction:5432/${POSTGRES_TRANSACTION_DB}
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/${RABBITMQ_VHOST}
-      CUSTOMER_SERVICE_URL: http://customer-service:${CUSTOMER_SERVICE_PORT}
+      CLIENTS_SERVICE_URL: http://clients-service:${CLIENTS_SERVICE_PORT}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
     ports:
@@ -140,7 +147,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      customer-service:
+      clients-service:
         condition: service_started
     networks:
       - banking-network

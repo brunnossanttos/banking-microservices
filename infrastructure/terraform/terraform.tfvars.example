@@ -1,0 +1,26 @@
+project_name = "banking"
+environment  = "production"  # development, staging, production
+aws_region   = "us-east-1"
+
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24"]
+enable_nat_gateway   = true
+
+admin_ip_cidr = ["YOUR_PUBLIC_IP/32"]
+
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAA... your-email@example.com"
+
+ec2_instance_type = "t3.medium"
+
+rds_instance_class = "db.t3.micro"  # Use db.t3.medium+ em producao
+db_username        = "dbadmin"
+db_password        = "CHANGE_ME_MINIMUM_16_CHARS"  # Minimo 16 caracteres
+
+redis_node_type = "cache.t3.micro"
+
+acm_certificate_arn = ""  # Ex: "arn:aws:acm:us-east-1:123456789:certificate/xxx"
+
+# JWT Secret - minimo 32 caracteres
+# Gere com: openssl rand -base64 32
+jwt_secret = "CHANGE_ME_MINIMUM_32_CHARACTERS_SECURE_RANDOM"

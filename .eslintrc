@@ -4,9 +4,7 @@
   "parserOptions": {
     "ecmaVersion": 2022,
     "sourceType": "module",
-    "project": [
-      "./packages/*/tsconfig.json"
-    ]
+    "project": ["./tsconfig.eslint.json"]
   },
   "plugins": [
     "@typescript-eslint",
@@ -39,9 +37,6 @@
         "selector": "interface",
         "format": [
           "PascalCase"
-        ],
-        "prefix": [
-          "I"
         ]
       },
       {
@@ -66,5 +61,20 @@
     "dist",
     "coverage",
     "*.js"
+  ],
+  "overrides": [
+    {
+      "files": ["**/__tests__/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
+      "rules": {
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/unbound-method": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/await-thenable": "off"
+      }
+    }
   ]
 }
