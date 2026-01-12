@@ -2,6 +2,7 @@ import http from 'http';
 import { createApp } from './app';
 import { env, connectDatabase, closeDatabase, connectRabbitMQ, closeRabbitMQ } from './config';
 import { logger } from './utils';
+import { startConsumers } from './consumers';
 
 let server: http.Server | null = null;
 
@@ -19,7 +20,7 @@ async function connectServices(): Promise<void> {
 
     connectionPromises.push(
       connectRabbitMQ()
-        .then(() => {})
+        .then(() => startConsumers())
         .catch(err => {
           logger.warn('RabbitMQ connection failed, continuing without rabbitmq', err);
         }),

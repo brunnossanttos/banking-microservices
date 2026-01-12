@@ -3,8 +3,12 @@ import { AppError } from '@banking/shared';
 import { User } from '../types';
 import { CreateUserInput, UpdateUserInput } from '../schemas/userSchema';
 import * as userRepository from '../repositories/userRepository';
+import * as cacheService from './cacheService';
+import * as eventService from './eventService';
+import { CACHE_KEYS } from './cacheService';
 
 const SALT_ROUNDS = 10;
+const USER_CACHE_TTL = 300; // 5 minutes
 
 function sanitizeCpf(cpf: string): string {
   return cpf.replace(/\D/g, '');
@@ -42,15 +46,27 @@ export async function createUser(input: CreateUserInput): Promise<Omit<User, 'pa
     bankingDetails: input.bankingDetails,
   });
 
+  eventService.publishUserCreated(user);
+
   return user;
 }
 
 export async function getUserById(id: string): Promise<Omit<User, 'password'>> {
+  const cacheKey = CACHE_KEYS.USER(id);
+  const cachedUser = await cacheService.get<Omit<User, 'password'>>(cacheKey);
+
+  console.log('🚀 ~ getUserById ~ cachedUser:', cachedUser);
+  if (cachedUser) {
+    return cachedUser;
+  }
+
   const user = await userRepository.findById(id);
 
   if (!user) {
     throw AppError.notFound('User not found');
   }
+
+  await cacheService.set(cacheKey, user, USER_CACHE_TTL);
 
   return user;
 }
@@ -84,11 +100,35 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<vo
     }
   }
 
+  const hasBankingChanges =
+    input.bankingDetails &&
+    (input.bankingDetails.agency !== user.bankingDetails.agency ||
+      input.bankingDetails.account !== user.bankingDetails.account ||
+      input.bankingDetails.accountType !== user.bankingDetails.accountType);
+
   await userRepository.updateUser(id, {
     name: input.name,
     email: input.email,
     bankingDetails: input.bankingDetails,
   });
+
+  await cacheService.invalidateUser(id, user.email, user.cpf);
+
+  const changes: Record<string, unknown> = {};
+  if (input.name) changes.name = input.name;
+  if (input.email) changes.email = input.email;
+  if (input.bankingDetails) changes.bankingDetails = input.bankingDetails;
+
+  eventService.publishUserUpdated(user, changes);
+
+  if (hasBankingChanges) {
+    eventService.publishBankingDetailsUpdated(
+      user.id,
+      user.email,
+      user.name,
+      input.bankingDetails!,
+    );
+  }
 }
 
 export async function updateProfilePicture(id: string, profilePictureUrl: string): Promise<void> {
@@ -99,4 +139,6 @@ export async function updateProfilePicture(id: string, profilePictureUrl: string
   }
 
   await userRepository.updateProfilePicture(id, profilePictureUrl);
+
+  await cacheService.invalidateUser(id, user.email, user.cpf);
 }
