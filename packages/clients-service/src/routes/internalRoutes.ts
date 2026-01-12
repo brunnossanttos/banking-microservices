@@ -11,22 +11,54 @@ router.use((req: Request, res: Response, next: NextFunction) => {
   authenticateInternalService(req, res, next);
 });
 
+async function getUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await userService.getUserById(req.params.userId);
+    res.status(StatusCodes.OK).json({
+      success: true,
+      data: user,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deposit(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { amount } = req.body as { amount: number };
+    const user = await userService.deposit(req.params.userId, amount);
+    res.status(StatusCodes.OK).json({
+      success: true,
+      data: user,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function withdraw(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { amount } = req.body as { amount: number };
+    const user = await userService.withdraw(req.params.userId, amount);
+    res.status(StatusCodes.OK).json({
+      success: true,
+      data: user,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 router.get(
   '/users/:userId',
   (req: Request, res: Response, next: NextFunction) => {
     void validateRequest(getUserSchema)(req, res, next);
   },
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const user = await userService.getUserById(req.params.userId);
-      res.status(StatusCodes.OK).json({
-        success: true,
-        data: user,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      next(error);
-    }
+  (req: Request, res: Response, next: NextFunction) => {
+    void getUser(req, res, next);
   },
 );
 
@@ -35,18 +67,8 @@ router.post(
   (req: Request, res: Response, next: NextFunction) => {
     void validateRequest(depositSchema)(req, res, next);
   },
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { amount } = req.body as { amount: number };
-      const user = await userService.deposit(req.params.userId, amount);
-      res.status(StatusCodes.OK).json({
-        success: true,
-        data: user,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      next(error);
-    }
+  (req: Request, res: Response, next: NextFunction) => {
+    void deposit(req, res, next);
   },
 );
 
@@ -55,18 +77,8 @@ router.post(
   (req: Request, res: Response, next: NextFunction) => {
     void validateRequest(withdrawSchema)(req, res, next);
   },
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { amount } = req.body as { amount: number };
-      const user = await userService.withdraw(req.params.userId, amount);
-      res.status(StatusCodes.OK).json({
-        success: true,
-        data: user,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      next(error);
-    }
+  (req: Request, res: Response, next: NextFunction) => {
+    void withdraw(req, res, next);
   },
 );
 
