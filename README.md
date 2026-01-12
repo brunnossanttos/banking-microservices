@@ -249,6 +249,26 @@ Consulte [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) para o guia completo d
 - Terraform para IaC
 - Scripts de deploy
 
+## CI/CD
+
+O projeto utiliza GitHub Actions para integracao e entrega continua.
+
+### Pipelines
+
+| Pipeline | Trigger | Descricao |
+|----------|---------|-----------|
+| **CI** | PR / push development | Lint, Build, Tests, Docker validation |
+| **CD** | push main | Quality gate, Deploy simulation, Release |
+
+### Badges
+
+```
+![CI](https://github.com/seu-usuario/banking-microservices/actions/workflows/ci.yml/badge.svg)
+![CD](https://github.com/seu-usuario/banking-microservices/actions/workflows/cd.yml/badge.svg)
+```
+
+Ver detalhes em [docs/PROGRESS_REPORT.md](docs/PROGRESS_REPORT.md#cicd-pipeline).
+
 ## Scripts Disponiveis
 
 | Script | Descricao |
@@ -280,3 +300,4 @@ Este projeto foi desenvolvido como parte de um desafio tecnico.
 - [Arquitetura Detalhada](docs/ARCHITECTURE.md)
 - [Deploy AWS](docs/AWS_DEPLOYMENT.md)
 - [Uso de Ferramentas de IA](docs/AI_USAGE.md)
+- [Relatorio de Progresso](docs/PROGRESS_REPORT.md)

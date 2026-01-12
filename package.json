@@ -18,6 +18,7 @@
     "test": "npm run test --workspaces",
     "lint": "eslint packages/clients-service/src packages/transactions-service/src packages/shared/src --ext .ts --fix",
     "format": "prettier --write packages/*/src/**/*.ts",
+    "format:check": "prettier --check packages/*/src/**/*.ts",
     "docker:up": "docker compose --env-file .env -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose --env-file .env -f docker/docker-compose.yml down",
     "docker:logs": "docker compose --env-file .env -f docker/docker-compose.yml logs -f",
