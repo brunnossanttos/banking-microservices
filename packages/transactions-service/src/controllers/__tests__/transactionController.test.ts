@@ -61,11 +61,7 @@ describe('transactionController', () => {
       mockReq.body = validInput;
       mockedTransactionService.createTransaction.mockResolvedValue(createdTransaction);
 
-      await transactionController.create(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await transactionController.create(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedTransactionService.createTransaction).toHaveBeenCalledWith(validInput);
       expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.CREATED);
@@ -83,11 +79,7 @@ describe('transactionController', () => {
       const error = new Error('Service error');
       mockedTransactionService.createTransaction.mockRejectedValue(error);
 
-      await transactionController.create(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await transactionController.create(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -114,11 +106,7 @@ describe('transactionController', () => {
       mockReq.params = { transactionId: 'transaction-uuid' };
       mockedTransactionService.getTransactionById.mockResolvedValue(existingTransaction);
 
-      await transactionController.getById(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await transactionController.getById(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedTransactionService.getTransactionById).toHaveBeenCalledWith('transaction-uuid');
       expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
@@ -135,11 +123,7 @@ describe('transactionController', () => {
       const error = new Error('Transaction not found');
       mockedTransactionService.getTransactionById.mockRejectedValue(error);
 
-      await transactionController.getById(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await transactionController.getById(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -176,11 +160,7 @@ describe('transactionController', () => {
       mockReq.query = { page: '1', limit: '10' };
       mockedTransactionService.getUserTransactions.mockResolvedValue(paginatedResult);
 
-      await transactionController.getByUserId(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await transactionController.getByUserId(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedTransactionService.getUserTransactions).toHaveBeenCalledWith('user-uuid', {
         status: undefined,
@@ -210,11 +190,7 @@ describe('transactionController', () => {
       };
       mockedTransactionService.getUserTransactions.mockResolvedValue(paginatedResult);
 
-      await transactionController.getByUserId(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await transactionController.getByUserId(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedTransactionService.getUserTransactions).toHaveBeenCalledWith('user-uuid', {
         status: 'completed',
@@ -232,11 +208,7 @@ describe('transactionController', () => {
       const error = new Error('User not found');
       mockedTransactionService.getUserTransactions.mockRejectedValue(error);
 
-      await transactionController.getByUserId(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await transactionController.getByUserId(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();

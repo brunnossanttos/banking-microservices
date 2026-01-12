@@ -57,9 +57,11 @@ export function validateEnv<T extends z.ZodTypeAny>(
       .map(err => `  - ${err.path.join('.')}: ${err.message}`)
       .join('\n');
 
+    // eslint-disable-next-line no-console
     console.error('Environment validation failed:\n' + errorMessages);
     process.exit(1);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return result.data;
 }

@@ -211,8 +211,12 @@ describe('userService', () => {
     it('should throw not found error when user does not exist', async () => {
       mockedRepository.findById.mockResolvedValue(null);
 
-      await expect(userService.updateUser('non-existent-id', { name: 'New Name' })).rejects.toThrow(AppError);
-      await expect(userService.updateUser('non-existent-id', { name: 'New Name' })).rejects.toMatchObject({
+      await expect(userService.updateUser('non-existent-id', { name: 'New Name' })).rejects.toThrow(
+        AppError,
+      );
+      await expect(
+        userService.updateUser('non-existent-id', { name: 'New Name' }),
+      ).rejects.toMatchObject({
         statusCode: 404,
         message: 'User not found',
       });
@@ -221,8 +225,12 @@ describe('userService', () => {
     it('should throw conflict error when new email already exists', async () => {
       mockedRepository.findByEmail.mockResolvedValue({ ...existingUser, id: 'other-id' });
 
-      await expect(userService.updateUser('uuid-123', { email: 'taken@example.com' })).rejects.toThrow(AppError);
-      await expect(userService.updateUser('uuid-123', { email: 'taken@example.com' })).rejects.toMatchObject({
+      await expect(
+        userService.updateUser('uuid-123', { email: 'taken@example.com' }),
+      ).rejects.toThrow(AppError);
+      await expect(
+        userService.updateUser('uuid-123', { email: 'taken@example.com' }),
+      ).rejects.toMatchObject({
         statusCode: 409,
         message: 'Email already registered',
       });
@@ -240,10 +248,14 @@ describe('userService', () => {
       mockedRepository.findByBankingDetails.mockResolvedValue({ ...existingUser, id: 'other-id' });
 
       await expect(
-        userService.updateUser('uuid-123', { bankingDetails: { agency: '0002', account: '99999-9' } }),
+        userService.updateUser('uuid-123', {
+          bankingDetails: { agency: '0002', account: '99999-9' },
+        }),
       ).rejects.toThrow(AppError);
       await expect(
-        userService.updateUser('uuid-123', { bankingDetails: { agency: '0002', account: '99999-9' } }),
+        userService.updateUser('uuid-123', {
+          bankingDetails: { agency: '0002', account: '99999-9' },
+        }),
       ).rejects.toMatchObject({
         statusCode: 409,
         message: 'Banking details already in use',
@@ -346,14 +358,21 @@ describe('userService', () => {
     });
 
     it('should deposit amount successfully', async () => {
-      const updatedUser = { ...existingUser, bankingDetails: { ...existingUser.bankingDetails, balance: 1500 } };
+      const updatedUser = {
+        ...existingUser,
+        bankingDetails: { ...existingUser.bankingDetails, balance: 1500 },
+      };
       mockedRepository.updateBalance.mockResolvedValue(updatedUser);
 
       const result = await userService.deposit('uuid-123', 500);
 
       expect(result).toEqual(updatedUser);
       expect(mockedRepository.updateBalance).toHaveBeenCalledWith('uuid-123', 500, 'credit');
-      expect(mockedCacheService.invalidateUser).toHaveBeenCalledWith('uuid-123', updatedUser.email, updatedUser.cpf);
+      expect(mockedCacheService.invalidateUser).toHaveBeenCalledWith(
+        'uuid-123',
+        updatedUser.email,
+        updatedUser.cpf,
+      );
     });
 
     it('should throw bad request error when amount is zero', async () => {
@@ -411,7 +430,10 @@ describe('userService', () => {
     });
 
     it('should withdraw amount successfully', async () => {
-      const updatedUser = { ...existingUser, bankingDetails: { ...existingUser.bankingDetails, balance: 500 } };
+      const updatedUser = {
+        ...existingUser,
+        bankingDetails: { ...existingUser.bankingDetails, balance: 500 },
+      };
       mockedRepository.updateBalance.mockResolvedValue(updatedUser);
 
       const result = await userService.withdraw('uuid-123', 500);
@@ -419,7 +441,11 @@ describe('userService', () => {
       expect(result).toEqual(updatedUser);
       expect(mockedRepository.findById).toHaveBeenCalledWith('uuid-123');
       expect(mockedRepository.updateBalance).toHaveBeenCalledWith('uuid-123', 500, 'debit');
-      expect(mockedCacheService.invalidateUser).toHaveBeenCalledWith('uuid-123', updatedUser.email, updatedUser.cpf);
+      expect(mockedCacheService.invalidateUser).toHaveBeenCalledWith(
+        'uuid-123',
+        updatedUser.email,
+        updatedUser.cpf,
+      );
     });
 
     it('should throw bad request error when amount is zero', async () => {

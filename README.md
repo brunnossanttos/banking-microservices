@@ -249,6 +249,26 @@ Consulte [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) para o guia completo d
 - Terraform para IaC
 - Scripts de deploy
 
+## CI/CD
+
+O projeto utiliza GitHub Actions para integracao e entrega continua.
+
+### Pipelines
+
+| Pipeline | Trigger | Descricao |
+|----------|---------|-----------|
+| **CI** | PR / push development | Lint, Build, Tests, Docker validation |
+| **CD** | push main | Quality gate, Deploy simulation, Release |
+
+### Badges
+
+```
+![CI](https://github.com/seu-usuario/banking-microservices/actions/workflows/ci.yml/badge.svg)
+![CD](https://github.com/seu-usuario/banking-microservices/actions/workflows/cd.yml/badge.svg)
+```
+
+Ver detalhes em [docs/PROGRESS_REPORT.md](docs/PROGRESS_REPORT.md#cicd-pipeline).
+
 ## Scripts Disponiveis
 
 | Script | Descricao |
@@ -263,6 +283,17 @@ Consulte [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) para o guia completo d
 | `npm run docker:infra` | Sobe apenas infraestrutura |
 
 ## Contribuicao
+
+### Gerenciamento de Dependencias
+
+O arquivo `package-lock.json` **deve ser commitado** no repositorio. Isso garante:
+- Builds reproduziveis (mesmas versoes em todos os ambientes)
+- Uso de `npm ci` no CI/CD (mais rapido e deterministico)
+- Verificacao de integridade dos pacotes
+
+> Nunca adicione `package-lock.json` ao `.gitignore`
+
+### Fluxo de Desenvolvimento
 
 1. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
 2. Commit suas mudancas (`git commit -m 'feat: adiciona nova feature'`)
@@ -280,3 +311,4 @@ Este projeto foi desenvolvido como parte de um desafio tecnico.
 - [Arquitetura Detalhada](docs/ARCHITECTURE.md)
 - [Deploy AWS](docs/AWS_DEPLOYMENT.md)
 - [Uso de Ferramentas de IA](docs/AI_USAGE.md)
+- [Relatorio de Progresso](docs/PROGRESS_REPORT.md)

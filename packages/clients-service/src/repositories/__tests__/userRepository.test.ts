@@ -134,10 +134,9 @@ describe('userRepository', () => {
       const result = await userRepository.findByEmail('test@example.com');
 
       expect(result).toEqual(expectedUser);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE email = $1'),
-        ['test@example.com'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE email = $1'), [
+        'test@example.com',
+      ]);
     });
 
     it('should return null when user not found', async () => {
@@ -156,10 +155,9 @@ describe('userRepository', () => {
       const result = await userRepository.findByCpf('12345678900');
 
       expect(result).toEqual(expectedUser);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE cpf = $1'),
-        ['12345678900'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE cpf = $1'), [
+        '12345678900',
+      ]);
     });
 
     it('should return null when user not found', async () => {
@@ -200,10 +198,9 @@ describe('userRepository', () => {
       const result = await userRepository.findById('uuid-123');
 
       expect(result).toEqual(expectedUser);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE id = $1'),
-        ['uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE id = $1'), [
+        'uuid-123',
+      ]);
     });
 
     it('should return null when user not found', async () => {
@@ -262,10 +259,10 @@ describe('userRepository', () => {
       const result = await userRepository.updateUser('uuid-123', { name: 'New Name' });
 
       expect(result).toBe(true);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE users'),
-        ['New Name', 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE users'), [
+        'New Name',
+        'uuid-123',
+      ]);
     });
 
     it('should update email only', async () => {
@@ -274,10 +271,10 @@ describe('userRepository', () => {
       const result = await userRepository.updateUser('uuid-123', { email: 'new@example.com' });
 
       expect(result).toBe(true);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('email = $1'),
-        ['new@example.com', 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('email = $1'), [
+        'new@example.com',
+        'uuid-123',
+      ]);
     });
 
     it('should update banking details', async () => {
@@ -303,10 +300,11 @@ describe('userRepository', () => {
       });
 
       expect(result).toBe(true);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringMatching(/name = \$1.*email = \$2/s),
-        ['New Name', 'new@example.com', 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/name = \$1.*email = \$2/s), [
+        'New Name',
+        'new@example.com',
+        'uuid-123',
+      ]);
     });
 
     it('should return false when no fields to update', async () => {
@@ -335,10 +333,10 @@ describe('userRepository', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE users'),
-        ['https://example.com/new-photo.jpg', 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE users'), [
+        'https://example.com/new-photo.jpg',
+        'uuid-123',
+      ]);
     });
 
     it('should return false when user not found', async () => {
@@ -362,10 +360,10 @@ describe('userRepository', () => {
 
       expect(result).not.toBeNull();
       expect(result?.bankingDetails.balance).toBe(1100.5);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('balance + $1'),
-        [100, 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('balance + $1'), [
+        100,
+        'uuid-123',
+      ]);
     });
 
     it('should debit amount and return updated user', async () => {
@@ -376,10 +374,10 @@ describe('userRepository', () => {
 
       expect(result).not.toBeNull();
       expect(result?.bankingDetails.balance).toBe(900.5);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('balance - $1'),
-        [100, 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('balance - $1'), [
+        100,
+        'uuid-123',
+      ]);
     });
 
     it('should include balance check for debit operation', async () => {
@@ -387,10 +385,10 @@ describe('userRepository', () => {
 
       await userRepository.updateBalance('uuid-123', 100, 'debit');
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND balance >= $1'),
-        [100, 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('AND balance >= $1'), [
+        100,
+        'uuid-123',
+      ]);
     });
 
     it('should not include balance check for credit operation', async () => {
@@ -398,10 +396,10 @@ describe('userRepository', () => {
 
       await userRepository.updateBalance('uuid-123', 100, 'credit');
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.not.stringContaining('AND balance >= $1'),
-        [100, 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.not.stringContaining('AND balance >= $1'), [
+        100,
+        'uuid-123',
+      ]);
     });
 
     it('should return null when user not found', async () => {

@@ -97,10 +97,9 @@ describe('transactionRepository', () => {
       const result = await transactionRepository.findById('uuid-123');
 
       expect(result).toEqual(expectedTransaction);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE id = $1'),
-        ['uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE id = $1'), [
+        'uuid-123',
+      ]);
     });
 
     it('should return null when transaction not found', async () => {
@@ -234,10 +233,12 @@ describe('transactionRepository', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('error_message = $2'),
-        ['failed', 'Insufficient balance', 'INSUFFICIENT_BALANCE', 'uuid-123'],
-      );
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('error_message = $2'), [
+        'failed',
+        'Insufficient balance',
+        'INSUFFICIENT_BALANCE',
+        'uuid-123',
+      ]);
     });
 
     it('should update status to reversed with reversed_at timestamp', async () => {
