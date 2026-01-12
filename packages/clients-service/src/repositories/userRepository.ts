@@ -1,5 +1,5 @@
 import { getPool } from '../config/database';
-import { CreateUserData, UpdateUserData, User, UserRow } from '../types';
+import { CreateUserData, UpdateUserData, User, UserRow, UserWithPassword } from '../types';
 
 function mapRowToUser(row: UserRow): Omit<User, 'password'> {
   return {
@@ -79,6 +79,37 @@ export async function findByEmail(email: string): Promise<Omit<User, 'password'>
   }
 
   return mapRowToUser(result.rows[0]);
+}
+
+export async function findByEmailWithPassword(email: string): Promise<UserWithPassword | null> {
+  const pool = getPool();
+
+  const query = `
+    SELECT id, email, password_hash, name, status
+    FROM users
+    WHERE email = $1 AND deleted_at IS NULL
+  `;
+
+  const result = await pool.query<{
+    id: string;
+    email: string;
+    password_hash: string;
+    name: string;
+    status: 'active' | 'inactive' | 'blocked' | 'pending_verification';
+  }>(query, [email]);
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    name: row.name,
+    status: row.status,
+  };
 }
 
 export async function findByCpf(cpf: string): Promise<Omit<User, 'password'> | null> {
@@ -183,7 +214,10 @@ export async function updateUser(id: string, data: UpdateUserData): Promise<bool
   return result.rowCount !== null && result.rowCount > 0;
 }
 
-export async function updateProfilePicture(id: string, profilePictureUrl: string): Promise<boolean> {
+export async function updateProfilePicture(
+  id: string,
+  profilePictureUrl: string,
+): Promise<boolean> {
   const pool = getPool();
 
   const query = `

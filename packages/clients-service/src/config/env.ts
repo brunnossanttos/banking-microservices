@@ -42,7 +42,8 @@ const clientsServiceEnvSchema = z.object({
     .string()
     .min(32, 'JWT_SECRET must be at least 32 characters for security')
     .default('your-super-secret-key-change-in-production'),
-  JWT_EXPIRES_IN: z.string().default('1d'),
+  JWT_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 });
 
 function validateEnv(): z.infer<typeof clientsServiceEnvSchema> {
@@ -90,6 +91,7 @@ export const env = {
   jwt: {
     secret: validatedEnv.JWT_SECRET,
     expiresIn: validatedEnv.JWT_EXPIRES_IN,
+    refreshExpiresIn: validatedEnv.JWT_REFRESH_EXPIRES_IN,
   },
 
   isDevelopment: validatedEnv.NODE_ENV === 'development',

@@ -7,3 +7,4 @@ export {
 } from '@banking/shared';
 
 export * from './user.types';
+export * from './auth.types';

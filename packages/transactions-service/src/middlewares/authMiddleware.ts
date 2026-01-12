@@ -63,3 +63,20 @@ export function authorizeTransactionParticipant(
 
   next();
 }
+
+export function authorizeOwner(userIdParam = 'userId') {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    const resourceUserId = req.params[userIdParam];
+    const currentUserId = req.user?.userId;
+
+    if (!currentUserId) {
+      throw AppError.unauthorized('User not authenticated');
+    }
+
+    if (resourceUserId !== currentUserId) {
+      throw AppError.forbidden('Access denied. You can only access your own resources');
+    }
+
+    next();
+  };
+}

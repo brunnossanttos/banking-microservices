@@ -5,30 +5,42 @@ import { cleanDatabase, generateTestEmail, generateTestCpf, generateTestAccount 
 
 const app = createApp();
 
+const createValidInput = () => ({
+  email: generateTestEmail(),
+  password: 'password123',
+  name: 'Integration Test User',
+  cpf: generateTestCpf(),
+  bankingDetails: {
+    agency: '0001',
+    account: generateTestAccount(),
+    accountType: 'checking',
+  },
+});
+
+const createUserAndLogin = async (input = createValidInput()) => {
+  const createResponse = await request(app).post('/api/users').send(input).expect(201);
+
+  const loginResponse = await request(app)
+    .post('/api/auth/login')
+    .send({ email: input.email, password: input.password })
+    .expect(200);
+
+  return {
+    userId: createResponse.body.data.id,
+    accessToken: loginResponse.body.data.accessToken,
+    input,
+  };
+};
+
 describe('POST /api/users', () => {
   beforeEach(async () => {
     await cleanDatabase();
   });
 
-  const createValidInput = () => ({
-    email: generateTestEmail(),
-    password: 'password123',
-    name: 'Integration Test User',
-    cpf: generateTestCpf(),
-    bankingDetails: {
-      agency: '0001',
-      account: generateTestAccount(),
-      accountType: 'checking',
-    },
-  });
-
   it('should create a user and persist in database', async () => {
     const input = createValidInput();
 
-    const response = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
+    const response = await request(app).post('/api/users').send(input).expect(201);
 
     expect(response.body).toMatchObject({
       success: true,
@@ -59,29 +71,29 @@ describe('POST /api/users', () => {
   it('should hash the password before storing', async () => {
     const input = createValidInput();
 
-    await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
+    await request(app).post('/api/users').send(input).expect(201);
 
     const pool = getPool();
-    const result = await pool.query('SELECT password_hash FROM users WHERE email = $1', [input.email]);
+    const result = await pool.query('SELECT password_hash FROM users WHERE email = $1', [
+      input.email,
+    ]);
 
     expect(result.rows[0].password_hash).not.toBe(input.password);
-    expect(result.rows[0].password_hash).toMatch(/^\$2[aby]\$/); // bcrypt hash format
+    expect(result.rows[0].password_hash).toMatch(/^\$2[aby]\$/);
   });
 
   it('should return 409 when email already exists', async () => {
     const input = createValidInput();
 
-    await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
+    await request(app).post('/api/users').send(input).expect(201);
 
     const response = await request(app)
       .post('/api/users')
-      .send({ ...input, cpf: generateTestCpf(), bankingDetails: { ...input.bankingDetails, account: generateTestAccount() } })
+      .send({
+        ...input,
+        cpf: generateTestCpf(),
+        bankingDetails: { ...input.bankingDetails, account: generateTestAccount() },
+      })
       .expect(409);
 
     expect(response.body).toMatchObject({
@@ -93,14 +105,15 @@ describe('POST /api/users', () => {
   it('should return 409 when CPF already exists', async () => {
     const input = createValidInput();
 
-    await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
+    await request(app).post('/api/users').send(input).expect(201);
 
     const response = await request(app)
       .post('/api/users')
-      .send({ ...input, email: generateTestEmail(), bankingDetails: { ...input.bankingDetails, account: generateTestAccount() } })
+      .send({
+        ...input,
+        email: generateTestEmail(),
+        bankingDetails: { ...input.bankingDetails, account: generateTestAccount() },
+      })
       .expect(409);
 
     expect(response.body).toMatchObject({
@@ -112,10 +125,7 @@ describe('POST /api/users', () => {
   it('should return 409 when banking details already exist', async () => {
     const input = createValidInput();
 
-    await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
+    await request(app).post('/api/users').send(input).expect(201);
 
     const response = await request(app)
       .post('/api/users')
@@ -131,10 +141,7 @@ describe('POST /api/users', () => {
   it('should return 400 for invalid email format', async () => {
     const input = { ...createValidInput(), email: 'invalid-email' };
 
-    const response = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(400);
+    const response = await request(app).post('/api/users').send(input).expect(400);
 
     expect(response.body.success).toBe(false);
     expect(response.body.details).toContainEqual(
@@ -145,10 +152,7 @@ describe('POST /api/users', () => {
   it('should return 400 for password too short', async () => {
     const input = { ...createValidInput(), password: '123' };
 
-    const response = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(400);
+    const response = await request(app).post('/api/users').send(input).expect(400);
 
     expect(response.body.success).toBe(false);
     expect(response.body.details).toContainEqual(
@@ -159,15 +163,10 @@ describe('POST /api/users', () => {
   it('should return 400 for invalid CPF format', async () => {
     const input = { ...createValidInput(), cpf: '123' };
 
-    const response = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(400);
+    const response = await request(app).post('/api/users').send(input).expect(400);
 
     expect(response.body.success).toBe(false);
-    expect(response.body.details).toContainEqual(
-      expect.objectContaining({ field: 'body.cpf' }),
-    );
+    expect(response.body.details).toContainEqual(expect.objectContaining({ field: 'body.cpf' }));
   });
 
   it('should sanitize CPF before storing', async () => {
@@ -175,10 +174,7 @@ describe('POST /api/users', () => {
     const formattedCpf = `${rawCpf.slice(0, 3)}.${rawCpf.slice(3, 6)}.${rawCpf.slice(6, 9)}-${rawCpf.slice(9, 11)}`;
     const input = { ...createValidInput(), cpf: formattedCpf };
 
-    await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
+    await request(app).post('/api/users').send(input).expect(201);
 
     const pool = getPool();
     const result = await pool.query('SELECT cpf FROM users WHERE email = $1', [input.email]);
@@ -191,30 +187,12 @@ describe('GET /api/users/:userId', () => {
     await cleanDatabase();
   });
 
-  const createValidInput = () => ({
-    email: generateTestEmail(),
-    password: 'password123',
-    name: 'Integration Test User',
-    cpf: generateTestCpf(),
-    bankingDetails: {
-      agency: '0001',
-      account: generateTestAccount(),
-      accountType: 'checking',
-    },
-  });
-
-  it('should return user data when user exists', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+  it('should return user data when user exists and authenticated', async () => {
+    const { userId, accessToken, input } = await createUserAndLogin();
 
     const response = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(response.body).toMatchObject({
@@ -235,22 +213,38 @@ describe('GET /api/users/:userId', () => {
     expect(response.body.timestamp).toBeDefined();
   });
 
-  it('should return 404 when user does not exist', async () => {
-    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+  it('should return 401 without authentication', async () => {
+    const { userId } = await createUserAndLogin();
 
-    const response = await request(app)
-      .get(`/api/users/${nonExistentId}`)
-      .expect(404);
+    const response = await request(app).get(`/api/users/${userId}`).expect(401);
 
     expect(response.body).toMatchObject({
       success: false,
-      error: 'User not found',
+      error: 'Authorization header missing',
+    });
+  });
+
+  it('should return 403 when accessing other user resources', async () => {
+    const { accessToken } = await createUserAndLogin();
+    const otherUser = await createUserAndLogin();
+
+    const response = await request(app)
+      .get(`/api/users/${otherUser.userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(403);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'Access denied. You can only access your own resources',
     });
   });
 
   it('should return 400 for invalid UUID format', async () => {
+    const { accessToken } = await createUserAndLogin();
+
     const response = await request(app)
       .get('/api/users/invalid-uuid')
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(400);
 
     expect(response.body.success).toBe(false);
@@ -260,17 +254,11 @@ describe('GET /api/users/:userId', () => {
   });
 
   it('should not return password in response', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(response.body.data.password).toBeUndefined();
@@ -283,30 +271,12 @@ describe('PATCH /api/users/:userId', () => {
     await cleanDatabase();
   });
 
-  const createValidInput = () => ({
-    email: generateTestEmail(),
-    password: 'password123',
-    name: 'Integration Test User',
-    cpf: generateTestCpf(),
-    bankingDetails: {
-      agency: '0001',
-      account: generateTestAccount(),
-      accountType: 'checking',
-    },
-  });
-
   it('should update user name successfully', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .patch(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ name: 'Updated Name' })
       .expect(200);
 
@@ -318,90 +288,80 @@ describe('PATCH /api/users/:userId', () => {
 
     const getResponse = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(getResponse.body.data.name).toBe('Updated Name');
   });
 
   it('should update user email successfully', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
     const newEmail = generateTestEmail();
 
     await request(app)
       .patch(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ email: newEmail })
       .expect(200);
 
     const getResponse = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(getResponse.body.data.email).toBe(newEmail);
   });
 
   it('should update banking details successfully', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken, input } = await createUserAndLogin();
 
     await request(app)
       .patch(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ bankingDetails: { agency: '0002' } })
       .expect(200);
 
     const getResponse = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(getResponse.body.data.bankingDetails.agency).toBe('0002');
     expect(getResponse.body.data.bankingDetails.account).toBe(input.bankingDetails.account);
   });
 
-  it('should return 404 when user does not exist', async () => {
-    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+  it('should return 401 without authentication', async () => {
+    const { userId } = await createUserAndLogin();
 
     const response = await request(app)
-      .patch(`/api/users/${nonExistentId}`)
+      .patch(`/api/users/${userId}`)
       .send({ name: 'New Name' })
-      .expect(404);
+      .expect(401);
 
-    expect(response.body).toMatchObject({
-      success: false,
-      error: 'User not found',
-    });
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should return 403 when updating other user', async () => {
+    const { accessToken } = await createUserAndLogin();
+    const otherUser = await createUserAndLogin();
+
+    const response = await request(app)
+      .patch(`/api/users/${otherUser.userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: 'New Name' })
+      .expect(403);
+
+    expect(response.body.success).toBe(false);
   });
 
   it('should return 409 when email already exists', async () => {
-    const input1 = createValidInput();
-    const input2 = createValidInput();
-
-    await request(app)
-      .post('/api/users')
-      .send(input1)
-      .expect(201);
-
-    const createResponse2 = await request(app)
-      .post('/api/users')
-      .send(input2)
-      .expect(201);
-
-    const userId2 = createResponse2.body.data.id;
+    const user1 = await createUserAndLogin();
+    const user2 = await createUserAndLogin();
 
     const response = await request(app)
-      .patch(`/api/users/${userId2}`)
-      .send({ email: input1.email })
+      .patch(`/api/users/${user2.userId}`)
+      .set('Authorization', `Bearer ${user2.accessToken}`)
+      .send({ email: user1.input.email })
       .expect(409);
 
     expect(response.body).toMatchObject({
@@ -411,27 +371,16 @@ describe('PATCH /api/users/:userId', () => {
   });
 
   it('should return 409 when banking details already exist', async () => {
-    const input1 = createValidInput();
-    const input2 = createValidInput();
-
-    await request(app)
-      .post('/api/users')
-      .send(input1)
-      .expect(201);
-
-    const createResponse2 = await request(app)
-      .post('/api/users')
-      .send(input2)
-      .expect(201);
-
-    const userId2 = createResponse2.body.data.id;
+    const user1 = await createUserAndLogin();
+    const user2 = await createUserAndLogin();
 
     const response = await request(app)
-      .patch(`/api/users/${userId2}`)
+      .patch(`/api/users/${user2.userId}`)
+      .set('Authorization', `Bearer ${user2.accessToken}`)
       .send({
         bankingDetails: {
-          agency: input1.bankingDetails.agency,
-          account: input1.bankingDetails.account,
+          agency: user1.input.bankingDetails.agency,
+          account: user1.input.bankingDetails.account,
         },
       })
       .expect(409);
@@ -443,8 +392,11 @@ describe('PATCH /api/users/:userId', () => {
   });
 
   it('should return 400 for invalid UUID format', async () => {
+    const { accessToken } = await createUserAndLogin();
+
     const response = await request(app)
       .patch('/api/users/invalid-uuid')
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ name: 'New Name' })
       .expect(400);
 
@@ -455,17 +407,11 @@ describe('PATCH /api/users/:userId', () => {
   });
 
   it('should return 400 when no fields provided', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .patch(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({})
       .expect(400);
 
@@ -473,17 +419,11 @@ describe('PATCH /api/users/:userId', () => {
   });
 
   it('should return 400 for invalid email format', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .patch(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ email: 'invalid-email' })
       .expect(400);
 
@@ -499,31 +439,13 @@ describe('PATCH /api/users/:userId/profile-picture', () => {
     await cleanDatabase();
   });
 
-  const createValidInput = () => ({
-    email: generateTestEmail(),
-    password: 'password123',
-    name: 'Integration Test User',
-    cpf: generateTestCpf(),
-    bankingDetails: {
-      agency: '0001',
-      account: generateTestAccount(),
-      accountType: 'checking',
-    },
-  });
-
   it('should update profile picture successfully', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
     const profilePictureUrl = 'https://example.com/photo.jpg';
 
     const response = await request(app)
       .patch(`/api/users/${userId}/profile-picture`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ profilePictureUrl })
       .expect(200);
 
@@ -535,28 +457,29 @@ describe('PATCH /api/users/:userId/profile-picture', () => {
 
     const getResponse = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(getResponse.body.data.profilePictureUrl).toBe(profilePictureUrl);
   });
 
-  it('should return 404 when user does not exist', async () => {
-    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+  it('should return 401 without authentication', async () => {
+    const { userId } = await createUserAndLogin();
 
     const response = await request(app)
-      .patch(`/api/users/${nonExistentId}/profile-picture`)
+      .patch(`/api/users/${userId}/profile-picture`)
       .send({ profilePictureUrl: 'https://example.com/photo.jpg' })
-      .expect(404);
+      .expect(401);
 
-    expect(response.body).toMatchObject({
-      success: false,
-      error: 'User not found',
-    });
+    expect(response.body.success).toBe(false);
   });
 
   it('should return 400 for invalid UUID format', async () => {
+    const { accessToken } = await createUserAndLogin();
+
     const response = await request(app)
       .patch('/api/users/invalid-uuid/profile-picture')
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ profilePictureUrl: 'https://example.com/photo.jpg' })
       .expect(400);
 
@@ -567,17 +490,11 @@ describe('PATCH /api/users/:userId/profile-picture', () => {
   });
 
   it('should return 400 for invalid URL format', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .patch(`/api/users/${userId}/profile-picture`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ profilePictureUrl: 'not-a-valid-url' })
       .expect(400);
 
@@ -588,17 +505,11 @@ describe('PATCH /api/users/:userId/profile-picture', () => {
   });
 
   it('should return 400 when profilePictureUrl is missing', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .patch(`/api/users/${userId}/profile-picture`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({})
       .expect(400);
 
@@ -611,30 +522,12 @@ describe('POST /api/users/:userId/deposit', () => {
     await cleanDatabase();
   });
 
-  const createValidInput = () => ({
-    email: generateTestEmail(),
-    password: 'password123',
-    name: 'Integration Test User',
-    cpf: generateTestCpf(),
-    bankingDetails: {
-      agency: '0001',
-      account: generateTestAccount(),
-      accountType: 'checking',
-    },
-  });
-
   it('should deposit amount and update balance', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 1000 })
       .expect(200);
 
@@ -650,51 +543,60 @@ describe('POST /api/users/:userId/deposit', () => {
 
     const getResponse = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(getResponse.body.data.bankingDetails.balance).toBe(1000);
   });
 
   it('should accumulate multiple deposits', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 500 })
       .expect(200);
 
     const response = await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 300 })
       .expect(200);
 
     expect(response.body.data.newBalance).toBe(800);
   });
 
-  it('should return 404 when user does not exist', async () => {
-    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+  it('should return 401 without authentication', async () => {
+    const { userId } = await createUserAndLogin();
 
     const response = await request(app)
-      .post(`/api/users/${nonExistentId}/deposit`)
+      .post(`/api/users/${userId}/deposit`)
       .send({ amount: 100 })
-      .expect(404);
+      .expect(401);
 
-    expect(response.body).toMatchObject({
-      success: false,
-      error: 'User not found',
-    });
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should return 403 when depositing to other user account', async () => {
+    const { accessToken } = await createUserAndLogin();
+    const otherUser = await createUserAndLogin();
+
+    const response = await request(app)
+      .post(`/api/users/${otherUser.userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ amount: 100 })
+      .expect(403);
+
+    expect(response.body.success).toBe(false);
   });
 
   it('should return 400 for invalid UUID format', async () => {
+    const { accessToken } = await createUserAndLogin();
+
     const response = await request(app)
       .post('/api/users/invalid-uuid/deposit')
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 100 })
       .expect(400);
 
@@ -705,17 +607,11 @@ describe('POST /api/users/:userId/deposit', () => {
   });
 
   it('should return 400 for zero amount', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 0 })
       .expect(400);
 
@@ -723,17 +619,11 @@ describe('POST /api/users/:userId/deposit', () => {
   });
 
   it('should return 400 for negative amount', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: -100 })
       .expect(400);
 
@@ -741,17 +631,11 @@ describe('POST /api/users/:userId/deposit', () => {
   });
 
   it('should return 400 when amount is missing', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({})
       .expect(400);
 
@@ -764,35 +648,18 @@ describe('POST /api/users/:userId/withdraw', () => {
     await cleanDatabase();
   });
 
-  const createValidInput = () => ({
-    email: generateTestEmail(),
-    password: 'password123',
-    name: 'Integration Test User',
-    cpf: generateTestCpf(),
-    bankingDetails: {
-      agency: '0001',
-      account: generateTestAccount(),
-      accountType: 'checking',
-    },
-  });
-
   it('should withdraw amount and update balance', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 1000 })
       .expect(200);
 
     const response = await request(app)
       .post(`/api/users/${userId}/withdraw`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 400 })
       .expect(200);
 
@@ -808,28 +675,24 @@ describe('POST /api/users/:userId/withdraw', () => {
 
     const getResponse = await request(app)
       .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
     expect(getResponse.body.data.bankingDetails.balance).toBe(600);
   });
 
   it('should return 400 for insufficient balance', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 100 })
       .expect(200);
 
     const response = await request(app)
       .post(`/api/users/${userId}/withdraw`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 500 })
       .expect(400);
 
@@ -839,23 +702,23 @@ describe('POST /api/users/:userId/withdraw', () => {
     });
   });
 
-  it('should return 404 when user does not exist', async () => {
-    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+  it('should return 401 without authentication', async () => {
+    const { userId } = await createUserAndLogin();
 
     const response = await request(app)
-      .post(`/api/users/${nonExistentId}/withdraw`)
+      .post(`/api/users/${userId}/withdraw`)
       .send({ amount: 100 })
-      .expect(404);
+      .expect(401);
 
-    expect(response.body).toMatchObject({
-      success: false,
-      error: 'User not found',
-    });
+    expect(response.body.success).toBe(false);
   });
 
   it('should return 400 for invalid UUID format', async () => {
+    const { accessToken } = await createUserAndLogin();
+
     const response = await request(app)
       .post('/api/users/invalid-uuid/withdraw')
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 100 })
       .expect(400);
 
@@ -866,17 +729,11 @@ describe('POST /api/users/:userId/withdraw', () => {
   });
 
   it('should return 400 for zero amount', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .post(`/api/users/${userId}/withdraw`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 0 })
       .expect(400);
 
@@ -884,17 +741,11 @@ describe('POST /api/users/:userId/withdraw', () => {
   });
 
   it('should return 400 for negative amount', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .post(`/api/users/${userId}/withdraw`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: -100 })
       .expect(400);
 
@@ -902,17 +753,11 @@ describe('POST /api/users/:userId/withdraw', () => {
   });
 
   it('should return 400 when amount is missing', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     const response = await request(app)
       .post(`/api/users/${userId}/withdraw`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({})
       .expect(400);
 
@@ -920,22 +765,17 @@ describe('POST /api/users/:userId/withdraw', () => {
   });
 
   it('should allow withdrawal of entire balance', async () => {
-    const input = createValidInput();
-
-    const createResponse = await request(app)
-      .post('/api/users')
-      .send(input)
-      .expect(201);
-
-    const userId = createResponse.body.data.id;
+    const { userId, accessToken } = await createUserAndLogin();
 
     await request(app)
       .post(`/api/users/${userId}/deposit`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 500 })
       .expect(200);
 
     const response = await request(app)
       .post(`/api/users/${userId}/withdraw`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({ amount: 500 })
       .expect(200);
 
