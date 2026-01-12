@@ -2,6 +2,7 @@ import { AppError } from '@banking/shared';
 import { Transaction, TransactionFilters, PaginatedTransactions, UserBankingInfo } from '../types';
 import { CreateTransactionInput } from '../schemas/transactionSchema';
 import * as transactionRepository from '../repositories/transactionRepository';
+import * as eventService from './eventService';
 import { env } from '../config/env';
 import axios from 'axios';
 import { logger } from '../utils/logger';
@@ -55,14 +56,18 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     type: 'transfer',
   });
 
-  // TODO: publicar na fila para processamento assíncrono
-  // por agora, marca como concluída de forma síncrona
+  eventService.publishTransactionCreated(transaction);
+
   await transactionRepository.updateStatus(transaction.id, 'completed');
 
-  return {
+  const completedTransaction: Transaction = {
     ...transaction,
     status: 'completed',
   };
+
+  eventService.publishTransactionCompleted(completedTransaction);
+
+  return completedTransaction;
 }
 
 export async function getTransactionById(id: string): Promise<Transaction> {
