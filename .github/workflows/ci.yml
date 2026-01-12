@@ -152,19 +152,37 @@ jobs:
       - name: Build packages
         run: npm run build:all
 
-      - name: Run integration tests
+      - name: Run integration tests - Clients Service
         env:
           NODE_ENV: test
           DB_HOST: localhost
           DB_PORT: 5432
           DB_USER: test
-          DB_PASSWORD: test
+          DB_PASS: test
           DB_NAME: clients_test
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           JWT_SECRET: test-secret-key-minimum-32-characters-long
           JWT_EXPIRES_IN: 1d
-        run: npm run test:integration --workspaces --if-present -- --passWithNoTests
+          INTERNAL_API_KEY: internal-service-api-key-change-in-production
+        run: npm run test:integration --workspace=@banking/clients-service -- --passWithNoTests
+        continue-on-error: true
+
+      - name: Run integration tests - Transactions Service
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5433
+          DB_USER: test
+          DB_PASS: test
+          DB_NAME: transactions_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_SECRET: test-secret-key-minimum-32-characters-long
+          JWT_EXPIRES_IN: 1d
+          INTERNAL_API_KEY: internal-service-api-key-change-in-production
+          CLIENTS_SERVICE_URL: http://localhost:3001
+        run: npm run test:integration --workspace=@banking/transactions-service -- --passWithNoTests
         continue-on-error: true
 
   docker-build:
