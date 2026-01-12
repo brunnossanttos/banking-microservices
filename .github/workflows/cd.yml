@@ -115,7 +115,8 @@ jobs:
       - name: Build clients-service
         uses: docker/build-push-action@v5
         with:
-          context: ./packages/clients-service
+          context: .
+          file: ./packages/clients-service/Dockerfile
           push: false
           tags: ${{ steps.meta-clients.outputs.tags }}
           labels: ${{ steps.meta-clients.outputs.labels }}
@@ -126,7 +127,8 @@ jobs:
       - name: Build transactions-service
         uses: docker/build-push-action@v5
         with:
-          context: ./packages/transactions-service
+          context: .
+          file: ./packages/transactions-service/Dockerfile
           push: false
           tags: ${{ steps.meta-transactions.outputs.tags }}
           labels: ${{ steps.meta-transactions.outputs.labels }}
@@ -183,7 +185,6 @@ jobs:
     name: Deploy Simulation
     runs-on: ubuntu-latest
     needs: [build-docker, terraform-validate]
-    environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

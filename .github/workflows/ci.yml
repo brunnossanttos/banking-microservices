@@ -181,7 +181,8 @@ jobs:
       - name: Build clients-service image
         uses: docker/build-push-action@v5
         with:
-          context: ./packages/clients-service
+          context: .
+          file: ./packages/clients-service/Dockerfile
           push: false
           tags: banking/clients-service:${{ github.sha }}
           cache-from: type=gha
@@ -190,7 +191,8 @@ jobs:
       - name: Build transactions-service image
         uses: docker/build-push-action@v5
         with:
-          context: ./packages/transactions-service
+          context: .
+          file: ./packages/transactions-service/Dockerfile
           push: false
           tags: banking/transactions-service:${{ github.sha }}
           cache-from: type=gha
