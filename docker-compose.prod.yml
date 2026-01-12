@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  clients-service:
+    build:
+      context: ./packages/clients-service
+      dockerfile: Dockerfile
+    container_name: banking-clients-service
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+
+      DB_HOST: ${CLIENTS_DB_HOST}
+      DB_PORT: ${CLIENTS_DB_PORT:-5432}
+      DB_USER: ${DB_USERNAME}
+      DB_PASS: ${DB_PASSWORD}
+      DB_NAME: ${CLIENTS_DB_NAME:-clients_db}
+
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+
+      RABBIT_HOST: ${RABBIT_HOST}
+      RABBIT_PORT: ${RABBIT_PORT:-5671}
+      RABBIT_USER: ${RABBIT_USER}
+      RABBIT_PASS: ${RABBIT_PASS}
+      RABBIT_VHOST: ${RABBIT_VHOST:-/}
+
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+    ports:
+      - "3001:3001"
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  transactions-service:
+    build:
+      context: ./packages/transactions-service
+      dockerfile: Dockerfile
+    container_name: banking-transactions-service
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+
+      DB_HOST: ${TRANSACTIONS_DB_HOST}
+      DB_PORT: ${TRANSACTIONS_DB_PORT:-5432}
+      DB_USER: ${DB_USERNAME}
+      DB_PASS: ${DB_PASSWORD}
+      DB_NAME: ${TRANSACTIONS_DB_NAME:-transactions_db}
+
+      CLIENTS_SERVICE_URL: http://clients-service:3001
+
+      RABBIT_HOST: ${RABBIT_HOST}
+      RABBIT_PORT: ${RABBIT_PORT:-5671}
+      RABBIT_USER: ${RABBIT_USER}
+      RABBIT_PASS: ${RABBIT_PASS}
+      RABBIT_VHOST: ${RABBIT_VHOST:-/}
+
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+    ports:
+      - "3002:3002"
+    depends_on:
+      clients-service:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+networks:
+  default:
+    name: banking-network
+    driver: bridge
