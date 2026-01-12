@@ -1,3 +1,5 @@
+process.env.JWT_SECRET = 'your-super-secret-key-change-in-production';
+
 import { connectDatabase, closeDatabase, getPool } from '../src/config/database';
 import { v4 as uuidv4 } from 'uuid';
 
