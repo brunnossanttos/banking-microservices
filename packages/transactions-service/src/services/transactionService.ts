@@ -26,6 +26,26 @@ async function getUserBankingInfo(userId: string): Promise<UserBankingInfo | nul
   }
 }
 
+async function withdrawFromUser(userId: string, amount: number): Promise<void> {
+  try {
+    await axios.post(`${env.clientsService.url}/api/users/${userId}/withdraw`, { amount });
+    logger.info('Withdraw successful', { userId, amount });
+  } catch (error) {
+    logger.error('Error withdrawing from user', { userId, amount, error });
+    throw AppError.internal('Failed to withdraw from sender account');
+  }
+}
+
+async function depositToUser(userId: string, amount: number): Promise<void> {
+  try {
+    await axios.post(`${env.clientsService.url}/api/users/${userId}/deposit`, { amount });
+    logger.info('Deposit successful', { userId, amount });
+  } catch (error) {
+    logger.error('Error depositing to user', { userId, amount, error });
+    throw AppError.internal('Failed to deposit to receiver account');
+  }
+}
+
 export async function createTransaction(input: CreateTransactionInput): Promise<Transaction> {
   if (input.senderUserId === input.receiverUserId) {
     throw AppError.badRequest('Cannot transfer to yourself');
@@ -58,16 +78,39 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
 
   eventService.publishTransactionCreated(transaction);
 
-  await transactionRepository.updateStatus(transaction.id, 'completed');
+  try {
+    // Debit from sender
+    await withdrawFromUser(input.senderUserId, input.amount);
 
-  const completedTransaction: Transaction = {
-    ...transaction,
-    status: 'completed',
-  };
+    // Credit to receiver
+    await depositToUser(input.receiverUserId, input.amount);
 
-  eventService.publishTransactionCompleted(completedTransaction);
+    await transactionRepository.updateStatus(transaction.id, 'completed');
 
-  return completedTransaction;
+    const completedTransaction: Transaction = {
+      ...transaction,
+      status: 'completed',
+    };
+
+    eventService.publishTransactionCompleted(completedTransaction);
+
+    return completedTransaction;
+  } catch (error) {
+    // If transfer fails, mark transaction as failed
+    await transactionRepository.updateStatus(transaction.id, 'failed');
+
+    const failedTransaction: Transaction = {
+      ...transaction,
+      status: 'failed',
+    };
+
+    eventService.publishTransactionFailed(
+      failedTransaction,
+      error instanceof Error ? error.message : 'Transfer failed',
+    );
+
+    throw error;
+  }
 }
 
 export async function getTransactionById(id: string): Promise<Transaction> {

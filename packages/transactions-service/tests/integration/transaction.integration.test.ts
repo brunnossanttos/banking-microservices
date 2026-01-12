@@ -6,6 +6,7 @@ import axios from 'axios';
 
 jest.mock('axios', () => ({
   get: jest.fn(),
+  post: jest.fn(),
   isAxiosError: (error: unknown): boolean => {
     return typeof error === 'object' && error !== null && 'isAxiosError' in error;
   },
@@ -30,6 +31,8 @@ describe('POST /api/transactions', () => {
   beforeEach(async () => {
     await cleanDatabase();
     mockedAxios.get.mockReset();
+    mockedAxios.post.mockReset();
+    mockedAxios.post.mockResolvedValue({ data: { success: true } });
   });
 
   const createValidInput = () => ({
@@ -226,6 +229,8 @@ describe('GET /api/transactions/:transactionId', () => {
   beforeEach(async () => {
     await cleanDatabase();
     mockedAxios.get.mockReset();
+    mockedAxios.post.mockReset();
+    mockedAxios.post.mockResolvedValue({ data: { success: true } });
   });
 
   it('should return transaction when exists', async () => {
@@ -299,6 +304,8 @@ describe('GET /api/transactions/user/:userId', () => {
   beforeEach(async () => {
     await cleanDatabase();
     mockedAxios.get.mockReset();
+    mockedAxios.post.mockReset();
+    mockedAxios.post.mockResolvedValue({ data: { success: true } });
   });
 
   const createTransaction = async (senderUserId: string, receiverUserId: string, amount: number) => {

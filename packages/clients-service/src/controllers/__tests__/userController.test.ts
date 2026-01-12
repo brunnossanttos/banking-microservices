@@ -9,6 +9,8 @@ jest.mock('../../services', () => ({
     getUserById: jest.fn(),
     updateUser: jest.fn(),
     updateProfilePicture: jest.fn(),
+    deposit: jest.fn(),
+    withdraw: jest.fn(),
   },
 }));
 
@@ -245,6 +247,130 @@ describe('userController', () => {
       mockedUserService.updateProfilePicture.mockRejectedValue(error);
 
       await userController.updateProfilePicture(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+      expect(mockRes.status).not.toHaveBeenCalled();
+      expect(mockRes.json).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deposit', () => {
+    const updatedUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 1500,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should deposit and return 200 with new balance', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { amount: 500 };
+      mockedUserService.deposit.mockResolvedValue(updatedUser);
+
+      await userController.deposit(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockedUserService.deposit).toHaveBeenCalledWith('uuid-123', 500);
+      expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          userId: 'uuid-123',
+          newBalance: 1500,
+        },
+        message: 'Deposit completed successfully',
+        timestamp: expect.any(String),
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should call next with error when service throws', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { amount: 500 };
+      const error = new Error('Deposit failed');
+      mockedUserService.deposit.mockRejectedValue(error);
+
+      await userController.deposit(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+      expect(mockRes.status).not.toHaveBeenCalled();
+      expect(mockRes.json).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('withdraw', () => {
+    const updatedUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 500,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should withdraw and return 200 with new balance', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { amount: 500 };
+      mockedUserService.withdraw.mockResolvedValue(updatedUser);
+
+      await userController.withdraw(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext,
+      );
+
+      expect(mockedUserService.withdraw).toHaveBeenCalledWith('uuid-123', 500);
+      expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          userId: 'uuid-123',
+          newBalance: 500,
+        },
+        message: 'Withdrawal completed successfully',
+        timestamp: expect.any(String),
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should call next with error when service throws', async () => {
+      mockReq.params = { userId: 'uuid-123' };
+      mockReq.body = { amount: 500 };
+      const error = new Error('Withdrawal failed');
+      mockedUserService.withdraw.mockRejectedValue(error);
+
+      await userController.withdraw(
         mockReq as Request,
         mockRes as Response,
         mockNext,

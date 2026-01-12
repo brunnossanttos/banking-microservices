@@ -352,4 +352,72 @@ describe('userRepository', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('updateBalance', () => {
+    it('should credit amount and return updated user', async () => {
+      const updatedRow = { ...mockUserRow, balance: '1100.50' };
+      mockQuery.mockResolvedValue({ rows: [updatedRow] });
+
+      const result = await userRepository.updateBalance('uuid-123', 100, 'credit');
+
+      expect(result).not.toBeNull();
+      expect(result?.bankingDetails.balance).toBe(1100.5);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('balance + $1'),
+        [100, 'uuid-123'],
+      );
+    });
+
+    it('should debit amount and return updated user', async () => {
+      const updatedRow = { ...mockUserRow, balance: '900.50' };
+      mockQuery.mockResolvedValue({ rows: [updatedRow] });
+
+      const result = await userRepository.updateBalance('uuid-123', 100, 'debit');
+
+      expect(result).not.toBeNull();
+      expect(result?.bankingDetails.balance).toBe(900.5);
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('balance - $1'),
+        [100, 'uuid-123'],
+      );
+    });
+
+    it('should include balance check for debit operation', async () => {
+      mockQuery.mockResolvedValue({ rows: [mockUserRow] });
+
+      await userRepository.updateBalance('uuid-123', 100, 'debit');
+
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND balance >= $1'),
+        [100, 'uuid-123'],
+      );
+    });
+
+    it('should not include balance check for credit operation', async () => {
+      mockQuery.mockResolvedValue({ rows: [mockUserRow] });
+
+      await userRepository.updateBalance('uuid-123', 100, 'credit');
+
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.not.stringContaining('AND balance >= $1'),
+        [100, 'uuid-123'],
+      );
+    });
+
+    it('should return null when user not found', async () => {
+      mockQuery.mockResolvedValue({ rows: [] });
+
+      const result = await userRepository.updateBalance('non-existent-id', 100, 'credit');
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when insufficient balance for debit', async () => {
+      mockQuery.mockResolvedValue({ rows: [] });
+
+      const result = await userRepository.updateBalance('uuid-123', 10000, 'debit');
+
+      expect(result).toBeNull();
+    });
+  });
 });

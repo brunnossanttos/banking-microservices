@@ -1,12 +1,16 @@
 import { AppError } from '@banking/shared';
 import * as userService from '../userService';
 import * as userRepository from '../../repositories/userRepository';
+import * as cacheService from '../cacheService';
 import bcrypt from 'bcrypt';
 
 jest.mock('../../repositories/userRepository');
+jest.mock('../cacheService');
+jest.mock('../eventService');
 jest.mock('bcrypt');
 
 const mockedRepository = userRepository as jest.Mocked<typeof userRepository>;
+const mockedCacheService = cacheService as jest.Mocked<typeof cacheService>;
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
 describe('userService', () => {
@@ -314,6 +318,156 @@ describe('userService', () => {
         message: 'User not found',
       });
       expect(mockedRepository.updateProfilePicture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deposit', () => {
+    const existingUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 1000,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockedCacheService.invalidateUser.mockResolvedValue();
+    });
+
+    it('should deposit amount successfully', async () => {
+      const updatedUser = { ...existingUser, bankingDetails: { ...existingUser.bankingDetails, balance: 1500 } };
+      mockedRepository.updateBalance.mockResolvedValue(updatedUser);
+
+      const result = await userService.deposit('uuid-123', 500);
+
+      expect(result).toEqual(updatedUser);
+      expect(mockedRepository.updateBalance).toHaveBeenCalledWith('uuid-123', 500, 'credit');
+      expect(mockedCacheService.invalidateUser).toHaveBeenCalledWith('uuid-123', updatedUser.email, updatedUser.cpf);
+    });
+
+    it('should throw bad request error when amount is zero', async () => {
+      await expect(userService.deposit('uuid-123', 0)).rejects.toThrow(AppError);
+      await expect(userService.deposit('uuid-123', 0)).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Amount must be greater than zero',
+      });
+      expect(mockedRepository.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it('should throw bad request error when amount is negative', async () => {
+      await expect(userService.deposit('uuid-123', -100)).rejects.toThrow(AppError);
+      await expect(userService.deposit('uuid-123', -100)).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Amount must be greater than zero',
+      });
+      expect(mockedRepository.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it('should throw not found error when user does not exist', async () => {
+      mockedRepository.updateBalance.mockResolvedValue(null);
+
+      await expect(userService.deposit('non-existent-id', 100)).rejects.toThrow(AppError);
+      await expect(userService.deposit('non-existent-id', 100)).rejects.toMatchObject({
+        statusCode: 404,
+        message: 'User not found',
+      });
+    });
+  });
+
+  describe('withdraw', () => {
+    const existingUser = {
+      id: 'uuid-123',
+      email: 'test@example.com',
+      name: 'John Doe',
+      cpf: '12345678900',
+      address: {},
+      bankingDetails: {
+        agency: '0001',
+        account: '12345-6',
+        accountType: 'checking' as const,
+        balance: 1000,
+      },
+      status: 'active' as const,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockedRepository.findById.mockResolvedValue(existingUser);
+      mockedCacheService.invalidateUser.mockResolvedValue();
+    });
+
+    it('should withdraw amount successfully', async () => {
+      const updatedUser = { ...existingUser, bankingDetails: { ...existingUser.bankingDetails, balance: 500 } };
+      mockedRepository.updateBalance.mockResolvedValue(updatedUser);
+
+      const result = await userService.withdraw('uuid-123', 500);
+
+      expect(result).toEqual(updatedUser);
+      expect(mockedRepository.findById).toHaveBeenCalledWith('uuid-123');
+      expect(mockedRepository.updateBalance).toHaveBeenCalledWith('uuid-123', 500, 'debit');
+      expect(mockedCacheService.invalidateUser).toHaveBeenCalledWith('uuid-123', updatedUser.email, updatedUser.cpf);
+    });
+
+    it('should throw bad request error when amount is zero', async () => {
+      await expect(userService.withdraw('uuid-123', 0)).rejects.toThrow(AppError);
+      await expect(userService.withdraw('uuid-123', 0)).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Amount must be greater than zero',
+      });
+      expect(mockedRepository.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it('should throw bad request error when amount is negative', async () => {
+      await expect(userService.withdraw('uuid-123', -100)).rejects.toThrow(AppError);
+      await expect(userService.withdraw('uuid-123', -100)).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Amount must be greater than zero',
+      });
+      expect(mockedRepository.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it('should throw not found error when user does not exist', async () => {
+      mockedRepository.findById.mockResolvedValue(null);
+
+      await expect(userService.withdraw('non-existent-id', 100)).rejects.toThrow(AppError);
+      await expect(userService.withdraw('non-existent-id', 100)).rejects.toMatchObject({
+        statusCode: 404,
+        message: 'User not found',
+      });
+      expect(mockedRepository.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it('should throw bad request error when insufficient balance', async () => {
+      await expect(userService.withdraw('uuid-123', 2000)).rejects.toThrow(AppError);
+      await expect(userService.withdraw('uuid-123', 2000)).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Insufficient balance',
+      });
+      expect(mockedRepository.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it('should throw bad request error when withdrawal fails', async () => {
+      mockedRepository.updateBalance.mockResolvedValue(null);
+
+      await expect(userService.withdraw('uuid-123', 500)).rejects.toThrow(AppError);
+      await expect(userService.withdraw('uuid-123', 500)).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Withdrawal failed',
+      });
     });
   });
 });

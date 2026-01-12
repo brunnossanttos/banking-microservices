@@ -22,3 +22,9 @@ export function generateTestCpf(): string {
   const random = () => Math.floor(Math.random() * 10);
   return `${random()}${random()}${random()}${random()}${random()}${random()}${random()}${random()}${random()}${random()}${random()}`;
 }
+
+let accountCounter = 0;
+export function generateTestAccount(): string {
+  accountCounter++;
+  return `ACC-${accountCounter}-${Math.random().toString(36).substring(2, 10)}`;
+}

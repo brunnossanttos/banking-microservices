@@ -55,7 +55,6 @@ export async function getUserById(id: string): Promise<Omit<User, 'password'>> {
   const cacheKey = CACHE_KEYS.USER(id);
   const cachedUser = await cacheService.get<Omit<User, 'password'>>(cacheKey);
 
-  console.log('🚀 ~ getUserById ~ cachedUser:', cachedUser);
   if (cachedUser) {
     return cachedUser;
   }
@@ -141,4 +140,46 @@ export async function updateProfilePicture(id: string, profilePictureUrl: string
   await userRepository.updateProfilePicture(id, profilePictureUrl);
 
   await cacheService.invalidateUser(id, user.email, user.cpf);
+}
+
+export async function deposit(id: string, amount: number): Promise<Omit<User, 'password'>> {
+  if (amount <= 0) {
+    throw AppError.badRequest('Amount must be greater than zero');
+  }
+
+  const updatedUser = await userRepository.updateBalance(id, amount, 'credit');
+
+  if (!updatedUser) {
+    throw AppError.notFound('User not found');
+  }
+
+  await cacheService.invalidateUser(id, updatedUser.email, updatedUser.cpf);
+
+  return updatedUser;
+}
+
+export async function withdraw(id: string, amount: number): Promise<Omit<User, 'password'>> {
+  if (amount <= 0) {
+    throw AppError.badRequest('Amount must be greater than zero');
+  }
+
+  const user = await userRepository.findById(id);
+
+  if (!user) {
+    throw AppError.notFound('User not found');
+  }
+
+  if (user.bankingDetails.balance < amount) {
+    throw AppError.badRequest('Insufficient balance');
+  }
+
+  const updatedUser = await userRepository.updateBalance(id, amount, 'debit');
+
+  if (!updatedUser) {
+    throw AppError.badRequest('Withdrawal failed');
+  }
+
+  await cacheService.invalidateUser(id, updatedUser.email, updatedUser.cpf);
+
+  return updatedUser;
 }

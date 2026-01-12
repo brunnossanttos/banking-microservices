@@ -5,6 +5,7 @@ import axios from 'axios';
 jest.mock('../../repositories/transactionRepository');
 jest.mock('axios', () => ({
   get: jest.fn(),
+  post: jest.fn(),
   isAxiosError: jest.fn(),
 }));
 jest.mock('../../utils/logger', () => ({
@@ -12,7 +13,13 @@ jest.mock('../../utils/logger', () => ({
     error: jest.fn(),
     info: jest.fn(),
     debug: jest.fn(),
+    warn: jest.fn(),
   },
+}));
+jest.mock('../eventService', () => ({
+  publishTransactionCreated: jest.fn(),
+  publishTransactionCompleted: jest.fn(),
+  publishTransactionFailed: jest.fn(),
 }));
 
 const mockedRepository = transactionRepository as jest.Mocked<typeof transactionRepository>;
@@ -61,6 +68,7 @@ describe('transactionService', () => {
       mockedAxios.get.mockResolvedValue({
         data: { success: true, data: mockUserBankingInfo },
       });
+      mockedAxios.post.mockResolvedValue({ data: { success: true } });
       mockedRepository.createTransaction.mockResolvedValue(mockTransaction);
       mockedRepository.updateStatus.mockResolvedValue(true);
     });
@@ -76,6 +84,23 @@ describe('transactionService', () => {
         description: validInput.description,
         type: 'transfer',
       });
+      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+    });
+
+    it('should mark transaction as failed when withdraw fails', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Withdraw failed'));
+
+      await expect(transactionService.createTransaction(validInput)).rejects.toThrow();
+      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(mockTransaction.id, 'failed');
+    });
+
+    it('should mark transaction as failed when deposit fails', async () => {
+      mockedAxios.post
+        .mockResolvedValueOnce({ data: { success: true } })
+        .mockRejectedValueOnce(new Error('Deposit failed'));
+
+      await expect(transactionService.createTransaction(validInput)).rejects.toThrow();
+      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(mockTransaction.id, 'failed');
     });
 
     it('should throw error when transferring to yourself', async () => {
@@ -134,6 +159,7 @@ describe('transactionService', () => {
       await transactionService.createTransaction(validInput);
 
       expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { createApp } from '../../src/app';
 import { getPool } from '../../src/config/database';
-import { cleanDatabase, generateTestEmail, generateTestCpf } from '../setup';
+import { cleanDatabase, generateTestEmail, generateTestCpf, generateTestAccount } from '../setup';
 
 const app = createApp();
 
@@ -17,7 +17,7 @@ describe('POST /api/users', () => {
     cpf: generateTestCpf(),
     bankingDetails: {
       agency: '0001',
-      account: `${Date.now()}`,
+      account: generateTestAccount(),
       accountType: 'checking',
     },
   });
@@ -50,7 +50,6 @@ describe('POST /api/users', () => {
     expect(response.body.data.id).toBeDefined();
     expect(response.body.timestamp).toBeDefined();
 
-    // Verify user exists in database
     const pool = getPool();
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [input.email]);
     expect(result.rows).toHaveLength(1);
@@ -82,7 +81,7 @@ describe('POST /api/users', () => {
 
     const response = await request(app)
       .post('/api/users')
-      .send({ ...input, cpf: generateTestCpf(), bankingDetails: { ...input.bankingDetails, account: `${Date.now()}` } })
+      .send({ ...input, cpf: generateTestCpf(), bankingDetails: { ...input.bankingDetails, account: generateTestAccount() } })
       .expect(409);
 
     expect(response.body).toMatchObject({
@@ -101,7 +100,7 @@ describe('POST /api/users', () => {
 
     const response = await request(app)
       .post('/api/users')
-      .send({ ...input, email: generateTestEmail(), bankingDetails: { ...input.bankingDetails, account: `${Date.now()}` } })
+      .send({ ...input, email: generateTestEmail(), bankingDetails: { ...input.bankingDetails, account: generateTestAccount() } })
       .expect(409);
 
     expect(response.body).toMatchObject({
@@ -199,7 +198,7 @@ describe('GET /api/users/:userId', () => {
     cpf: generateTestCpf(),
     bankingDetails: {
       agency: '0001',
-      account: `${Date.now()}`,
+      account: generateTestAccount(),
       accountType: 'checking',
     },
   });
@@ -291,7 +290,7 @@ describe('PATCH /api/users/:userId', () => {
     cpf: generateTestCpf(),
     bankingDetails: {
       agency: '0001',
-      account: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      account: generateTestAccount(),
       accountType: 'checking',
     },
   });
@@ -507,7 +506,7 @@ describe('PATCH /api/users/:userId/profile-picture', () => {
     cpf: generateTestCpf(),
     bankingDetails: {
       agency: '0001',
-      account: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      account: generateTestAccount(),
       accountType: 'checking',
     },
   });
@@ -534,7 +533,6 @@ describe('PATCH /api/users/:userId/profile-picture', () => {
     });
     expect(response.body.timestamp).toBeDefined();
 
-    // Verify the update persisted
     const getResponse = await request(app)
       .get(`/api/users/${userId}`)
       .expect(200);
@@ -605,5 +603,342 @@ describe('PATCH /api/users/:userId/profile-picture', () => {
       .expect(400);
 
     expect(response.body.success).toBe(false);
+  });
+});
+
+describe('POST /api/users/:userId/deposit', () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+  });
+
+  const createValidInput = () => ({
+    email: generateTestEmail(),
+    password: 'password123',
+    name: 'Integration Test User',
+    cpf: generateTestCpf(),
+    bankingDetails: {
+      agency: '0001',
+      account: generateTestAccount(),
+      accountType: 'checking',
+    },
+  });
+
+  it('should deposit amount and update balance', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: 1000 })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      message: 'Deposit completed successfully',
+      data: {
+        userId,
+        newBalance: 1000,
+      },
+    });
+    expect(response.body.timestamp).toBeDefined();
+
+    const getResponse = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(getResponse.body.data.bankingDetails.balance).toBe(1000);
+  });
+
+  it('should accumulate multiple deposits', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: 500 })
+      .expect(200);
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: 300 })
+      .expect(200);
+
+    expect(response.body.data.newBalance).toBe(800);
+  });
+
+  it('should return 404 when user does not exist', async () => {
+    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+
+    const response = await request(app)
+      .post(`/api/users/${nonExistentId}/deposit`)
+      .send({ amount: 100 })
+      .expect(404);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'User not found',
+    });
+  });
+
+  it('should return 400 for invalid UUID format', async () => {
+    const response = await request(app)
+      .post('/api/users/invalid-uuid/deposit')
+      .send({ amount: 100 })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'params.userId' }),
+    );
+  });
+
+  it('should return 400 for zero amount', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: 0 })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should return 400 for negative amount', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: -100 })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should return 400 when amount is missing', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({})
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+});
+
+describe('POST /api/users/:userId/withdraw', () => {
+  beforeEach(async () => {
+    await cleanDatabase();
+  });
+
+  const createValidInput = () => ({
+    email: generateTestEmail(),
+    password: 'password123',
+    name: 'Integration Test User',
+    cpf: generateTestCpf(),
+    bankingDetails: {
+      agency: '0001',
+      account: generateTestAccount(),
+      accountType: 'checking',
+    },
+  });
+
+  it('should withdraw amount and update balance', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: 1000 })
+      .expect(200);
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/withdraw`)
+      .send({ amount: 400 })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      message: 'Withdrawal completed successfully',
+      data: {
+        userId,
+        newBalance: 600,
+      },
+    });
+    expect(response.body.timestamp).toBeDefined();
+
+    const getResponse = await request(app)
+      .get(`/api/users/${userId}`)
+      .expect(200);
+
+    expect(getResponse.body.data.bankingDetails.balance).toBe(600);
+  });
+
+  it('should return 400 for insufficient balance', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: 100 })
+      .expect(200);
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/withdraw`)
+      .send({ amount: 500 })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'Insufficient balance',
+    });
+  });
+
+  it('should return 404 when user does not exist', async () => {
+    const nonExistentId = '00000000-0000-0000-0000-000000000000';
+
+    const response = await request(app)
+      .post(`/api/users/${nonExistentId}/withdraw`)
+      .send({ amount: 100 })
+      .expect(404);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: 'User not found',
+    });
+  });
+
+  it('should return 400 for invalid UUID format', async () => {
+    const response = await request(app)
+      .post('/api/users/invalid-uuid/withdraw')
+      .send({ amount: 100 })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'params.userId' }),
+    );
+  });
+
+  it('should return 400 for zero amount', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/withdraw`)
+      .send({ amount: 0 })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should return 400 for negative amount', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/withdraw`)
+      .send({ amount: -100 })
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should return 400 when amount is missing', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/withdraw`)
+      .send({})
+      .expect(400);
+
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should allow withdrawal of entire balance', async () => {
+    const input = createValidInput();
+
+    const createResponse = await request(app)
+      .post('/api/users')
+      .send(input)
+      .expect(201);
+
+    const userId = createResponse.body.data.id;
+
+    await request(app)
+      .post(`/api/users/${userId}/deposit`)
+      .send({ amount: 500 })
+      .expect(200);
+
+    const response = await request(app)
+      .post(`/api/users/${userId}/withdraw`)
+      .send({ amount: 500 })
+      .expect(200);
+
+    expect(response.body.data.newBalance).toBe(0);
   });
 });

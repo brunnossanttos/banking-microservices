@@ -7,6 +7,10 @@ import {
   UpdateUserInput,
   UpdateUserParams,
   UpdateProfilePictureInput,
+  DepositInput,
+  DepositParams,
+  WithdrawInput,
+  WithdrawParams,
 } from '../schemas/userSchema';
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -71,6 +75,48 @@ export async function updateProfilePicture(
     res.status(StatusCodes.OK).json({
       success: true,
       message: 'Profile picture updated successfully',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deposit(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req.params as unknown as DepositParams;
+    const { amount } = req.body as DepositInput;
+
+    const user = await userService.deposit(userId, amount);
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      data: {
+        userId: user.id,
+        newBalance: user.bankingDetails.balance,
+      },
+      message: 'Deposit completed successfully',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function withdraw(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req.params as unknown as WithdrawParams;
+    const { amount } = req.body as WithdrawInput;
+
+    const user = await userService.withdraw(userId, amount);
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      data: {
+        userId: user.id,
+        newBalance: user.bankingDetails.balance,
+      },
+      message: 'Withdrawal completed successfully',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

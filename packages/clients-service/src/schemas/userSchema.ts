@@ -71,9 +71,31 @@ export const loginSchema = z.object({
   }),
 });
 
+export const depositSchema = z.object({
+  params: z.object({
+    userId: z.string().uuid('Invalid user ID format'),
+  }),
+  body: z.object({
+    amount: z.number().positive('Amount must be greater than zero'),
+  }),
+});
+
+export const withdrawSchema = z.object({
+  params: z.object({
+    userId: z.string().uuid('Invalid user ID format'),
+  }),
+  body: z.object({
+    amount: z.number().positive('Amount must be greater than zero'),
+  }),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];
 export type GetUserParams = z.infer<typeof getUserSchema>['params'];
 export type UpdateUserInput = z.infer<typeof updateUserSchema>['body'];
 export type UpdateUserParams = z.infer<typeof updateUserSchema>['params'];
 export type UpdateProfilePictureInput = z.infer<typeof updateProfilePictureSchema>['body'];
 export type LoginInput = z.infer<typeof loginSchema>['body'];
+export type DepositInput = z.infer<typeof depositSchema>['body'];
+export type DepositParams = z.infer<typeof depositSchema>['params'];
+export type WithdrawInput = z.infer<typeof withdrawSchema>['body'];
+export type WithdrawParams = z.infer<typeof withdrawSchema>['params'];

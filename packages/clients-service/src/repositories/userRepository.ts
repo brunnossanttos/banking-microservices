@@ -195,3 +195,29 @@ export async function updateProfilePicture(id: string, profilePictureUrl: string
   const result = await pool.query(query, [profilePictureUrl, id]);
   return result.rowCount !== null && result.rowCount > 0;
 }
+
+export async function updateBalance(
+  id: string,
+  amount: number,
+  operation: 'credit' | 'debit',
+): Promise<Omit<User, 'password'> | null> {
+  const pool = getPool();
+
+  const operator = operation === 'credit' ? '+' : '-';
+
+  const query = `
+    UPDATE users
+    SET balance = balance ${operator} $1, updated_at = NOW()
+    WHERE id = $2 AND deleted_at IS NULL
+    ${operation === 'debit' ? 'AND balance >= $1' : ''}
+    RETURNING *
+  `;
+
+  const result = await pool.query<UserRow>(query, [amount, id]);
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return mapRowToUser(result.rows[0]);
+}

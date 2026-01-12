@@ -6,6 +6,8 @@ import {
   getUserSchema,
   updateUserSchema,
   updateProfilePictureSchema,
+  depositSchema,
+  withdrawSchema,
 } from '../schemas/userSchema';
 
 const router = Router();
@@ -47,6 +49,26 @@ router.patch(
   },
   (req: Request, res: Response, next: NextFunction) => {
     void userController.updateProfilePicture(req, res, next);
+  },
+);
+
+router.post(
+  '/:userId/deposit',
+  (req: Request, res: Response, next: NextFunction) => {
+    void validateRequest(depositSchema)(req, res, next);
+  },
+  (req: Request, res: Response, next: NextFunction) => {
+    void userController.deposit(req, res, next);
+  },
+);
+
+router.post(
+  '/:userId/withdraw',
+  (req: Request, res: Response, next: NextFunction) => {
+    void validateRequest(withdrawSchema)(req, res, next);
+  },
+  (req: Request, res: Response, next: NextFunction) => {
+    void userController.withdraw(req, res, next);
   },
 );
 
