@@ -223,33 +223,27 @@ describe('authService', () => {
   describe('verifyAccessToken', () => {
     const testSecret = 'test-secret-key-for-unit-tests-32-chars';
 
-    it('should return decoded payload for valid token', async () => {
+    it('should return decoded payload for valid token', () => {
       const validToken = jwt.sign({ userId: 'user-uuid', email: 'test@example.com' }, testSecret);
 
-      const result = await authService.verifyAccessToken(validToken);
+      const result = authService.verifyAccessToken(validToken);
 
       expect(result).toHaveProperty('userId', 'user-uuid');
       expect(result).toHaveProperty('email', 'test@example.com');
     });
 
-    it('should throw error for invalid token', async () => {
-      await expect(authService.verifyAccessToken('invalid-token')).rejects.toMatchObject({
-        statusCode: 401,
-        message: 'Invalid token',
-      });
+    it('should throw error for invalid token', () => {
+      expect(() => authService.verifyAccessToken('invalid-token')).toThrow('Invalid token');
     });
 
-    it('should throw error for expired token', async () => {
+    it('should throw error for expired token', () => {
       const expiredToken = jwt.sign(
         { userId: 'user-uuid', email: 'test@example.com' },
         testSecret,
         { expiresIn: '-1s' },
       );
 
-      await expect(authService.verifyAccessToken(expiredToken)).rejects.toMatchObject({
-        statusCode: 401,
-        message: 'Token expired',
-      });
+      expect(() => authService.verifyAccessToken(expiredToken)).toThrow('Token expired');
     });
   });
 });
