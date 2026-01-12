@@ -284,6 +284,17 @@ Ver detalhes em [docs/PROGRESS_REPORT.md](docs/PROGRESS_REPORT.md#cicd-pipeline)
 
 ## Contribuicao
 
+### Gerenciamento de Dependencias
+
+O arquivo `package-lock.json` **deve ser commitado** no repositorio. Isso garante:
+- Builds reproduziveis (mesmas versoes em todos os ambientes)
+- Uso de `npm ci` no CI/CD (mais rapido e deterministico)
+- Verificacao de integridade dos pacotes
+
+> Nunca adicione `package-lock.json` ao `.gitignore`
+
+### Fluxo de Desenvolvimento
+
 1. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
 2. Commit suas mudancas (`git commit -m 'feat: adiciona nova feature'`)
 3. Push para a branch (`git push origin feature/nova-feature`)
