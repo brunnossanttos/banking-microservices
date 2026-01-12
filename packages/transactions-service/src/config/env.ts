@@ -33,6 +33,11 @@ const transactionsServiceEnvSchema = z.object({
 
   CLIENTS_SERVICE_URL: z.string().url().default('http://localhost:3001'),
 
+  INTERNAL_API_KEY: z
+    .string()
+    .min(32, 'INTERNAL_API_KEY must be at least 32 characters')
+    .default('internal-service-api-key-change-in-production'),
+
   JWT_SECRET: z
     .string()
     .min(32, 'JWT_SECRET must be at least 32 characters for security')
@@ -80,6 +85,7 @@ export const env = {
 
   clientsService: {
     url: validatedEnv.CLIENTS_SERVICE_URL,
+    internalApiKey: validatedEnv.INTERNAL_API_KEY,
   },
 
   jwt: {

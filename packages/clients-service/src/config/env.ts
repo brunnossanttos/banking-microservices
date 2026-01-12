@@ -44,6 +44,11 @@ const clientsServiceEnvSchema = z.object({
     .default('your-super-secret-key-change-in-production'),
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+
+  INTERNAL_API_KEY: z
+    .string()
+    .min(32, 'INTERNAL_API_KEY must be at least 32 characters')
+    .default('internal-service-api-key-change-in-production'),
 });
 
 function validateEnv(): z.infer<typeof clientsServiceEnvSchema> {
@@ -93,6 +98,8 @@ export const env = {
     expiresIn: validatedEnv.JWT_EXPIRES_IN,
     refreshExpiresIn: validatedEnv.JWT_REFRESH_EXPIRES_IN,
   },
+
+  internalApiKey: validatedEnv.INTERNAL_API_KEY,
 
   isDevelopment: validatedEnv.NODE_ENV === 'development',
   isProduction: validatedEnv.NODE_ENV === 'production',

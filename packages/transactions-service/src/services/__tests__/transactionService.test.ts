@@ -1,5 +1,6 @@
 import * as transactionService from '../transactionService';
 import * as transactionRepository from '../../repositories/transactionRepository';
+import * as eventService from '../eventService';
 import axios from 'axios';
 
 jest.mock('../../repositories/transactionRepository');
@@ -20,10 +21,12 @@ jest.mock('../eventService', () => ({
   publishTransactionCreated: jest.fn(),
   publishTransactionCompleted: jest.fn(),
   publishTransactionFailed: jest.fn(),
+  publishTransactionReversed: jest.fn(),
 }));
 
 const mockedRepository = transactionRepository as jest.Mocked<typeof transactionRepository>;
 const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedEventService = eventService as jest.Mocked<typeof eventService>;
 
 describe('transactionService', () => {
   const mockUserBankingInfo = {
@@ -73,7 +76,7 @@ describe('transactionService', () => {
       mockedRepository.updateStatus.mockResolvedValue(true);
     });
 
-    it('should create transaction successfully', async () => {
+    it('should create transaction successfully using saga', async () => {
       const result = await transactionService.createTransaction(validInput);
 
       expect(result.status).toBe('completed');
@@ -84,23 +87,64 @@ describe('transactionService', () => {
         description: validInput.description,
         type: 'transfer',
       });
+      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(mockTransaction.id, 'processing');
+      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(mockTransaction.id, 'completed');
       expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+      expect(mockedEventService.publishTransactionCreated).toHaveBeenCalled();
+      expect(mockedEventService.publishTransactionCompleted).toHaveBeenCalled();
     });
 
     it('should mark transaction as failed when withdraw fails', async () => {
       mockedAxios.post.mockRejectedValueOnce(new Error('Withdraw failed'));
 
       await expect(transactionService.createTransaction(validInput)).rejects.toThrow();
-      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(mockTransaction.id, 'failed');
+
+      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(
+        mockTransaction.id,
+        'failed',
+        expect.any(String),
+        'TRANSFER_FAILED',
+      );
+      expect(mockedEventService.publishTransactionFailed).toHaveBeenCalled();
     });
 
-    it('should mark transaction as failed when deposit fails', async () => {
+    it('should compensate and mark as reversed when deposit fails after withdraw', async () => {
       mockedAxios.post
         .mockResolvedValueOnce({ data: { success: true } })
-        .mockRejectedValueOnce(new Error('Deposit failed'));
+        .mockRejectedValueOnce(new Error('Deposit failed'))
+        .mockResolvedValueOnce({ data: { success: true } });
 
       await expect(transactionService.createTransaction(validInput)).rejects.toThrow();
-      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(mockTransaction.id, 'failed');
+
+      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(
+        mockTransaction.id,
+        'reversed',
+        expect.any(String),
+        'TRANSFER_FAILED',
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+      expect(mockedEventService.publishTransactionReversed).toHaveBeenCalled();
+      expect(mockedEventService.publishTransactionFailed).toHaveBeenCalled();
+    });
+
+    it('should mark as failed with COMPENSATION_FAILED when refund fails', async () => {
+      mockedAxios.post
+        .mockResolvedValueOnce({ data: { success: true } })
+        .mockRejectedValueOnce(new Error('Deposit failed'))
+        .mockRejectedValueOnce(new Error('Refund failed'));
+
+      await expect(transactionService.createTransaction(validInput)).rejects.toThrow();
+
+      expect(mockedRepository.updateStatus).toHaveBeenCalledWith(
+        mockTransaction.id,
+        'failed',
+        expect.any(String),
+        'COMPENSATION_FAILED',
+      );
+
+      expect(mockedEventService.publishTransactionReversed).not.toHaveBeenCalled();
+      expect(mockedEventService.publishTransactionFailed).toHaveBeenCalled();
     });
 
     it('should throw error when transferring to yourself', async () => {
@@ -159,7 +203,21 @@ describe('transactionService', () => {
       await transactionService.createTransaction(validInput);
 
       expect(mockedAxios.get).toHaveBeenCalledTimes(2);
-      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+    });
+
+    it('should set transaction to processing before executing saga', async () => {
+      await transactionService.createTransaction(validInput);
+
+      const updateStatusCalls = mockedRepository.updateStatus.mock.calls;
+      const processingCall = updateStatusCalls.find(call => call[1] === 'processing');
+      const completedCall = updateStatusCalls.find(call => call[1] === 'completed');
+
+      expect(processingCall).toBeDefined();
+      expect(completedCall).toBeDefined();
+
+      const processingIndex = updateStatusCalls.indexOf(processingCall!);
+      const completedIndex = updateStatusCalls.indexOf(completedCall!);
+      expect(processingIndex).toBeLessThan(completedIndex);
     });
   });
 
@@ -244,8 +302,6 @@ describe('transactionService', () => {
         type: 'transfer',
         page: 2,
         limit: 20,
-        startDate: undefined,
-        endDate: undefined,
       });
     });
 

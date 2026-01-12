@@ -6,6 +6,8 @@ export {
   PaginationParams,
 } from '@banking/shared';
 
+export * from './saga';
+
 export type TransactionStatus =
   | 'pending'
   | 'processing'
