@@ -1,16 +1,29 @@
 import { AppError } from '@banking/shared';
-import { Transaction, TransactionFilters, PaginatedTransactions, UserBankingInfo } from '../types';
+import axios from 'axios';
+import {
+  Transaction,
+  TransactionFilters,
+  PaginatedTransactions,
+  UserBankingInfo,
+  TransferSagaContext,
+  CompensationResult,
+} from '../types';
 import { CreateTransactionInput } from '../schemas/transactionSchema';
 import * as transactionRepository from '../repositories/transactionRepository';
 import * as eventService from './eventService';
+import { createTransferSaga } from './transferSaga';
 import { env } from '../config/env';
-import axios from 'axios';
 import { logger } from '../utils/logger';
+
+const internalApiHeaders = {
+  'x-internal-api-key': env.clientsService.internalApiKey,
+};
 
 async function getUserBankingInfo(userId: string): Promise<UserBankingInfo | null> {
   try {
     const response = await axios.get<{ success: boolean; data: UserBankingInfo }>(
-      `${env.clientsService.url}/api/users/${userId}`,
+      `${env.clientsService.url}/api/internal/users/${userId}`,
+      { headers: internalApiHeaders },
     );
 
     if (response.data.success) {
@@ -26,24 +39,8 @@ async function getUserBankingInfo(userId: string): Promise<UserBankingInfo | nul
   }
 }
 
-async function withdrawFromUser(userId: string, amount: number): Promise<void> {
-  try {
-    await axios.post(`${env.clientsService.url}/api/users/${userId}/withdraw`, { amount });
-    logger.info('Withdraw successful', { userId, amount });
-  } catch (error) {
-    logger.error('Error withdrawing from user', { userId, amount, error });
-    throw AppError.internal('Failed to withdraw from sender account');
-  }
-}
-
-async function depositToUser(userId: string, amount: number): Promise<void> {
-  try {
-    await axios.post(`${env.clientsService.url}/api/users/${userId}/deposit`, { amount });
-    logger.info('Deposit successful', { userId, amount });
-  } catch (error) {
-    logger.error('Error depositing to user', { userId, amount, error });
-    throw AppError.internal('Failed to deposit to receiver account');
-  }
+function hasCompensationFailures(results?: CompensationResult[]): boolean {
+  return results?.some(r => !r.success) ?? false;
 }
 
 export async function createTransaction(input: CreateTransactionInput): Promise<Transaction> {
@@ -78,13 +75,21 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
 
   eventService.publishTransactionCreated(transaction);
 
-  try {
-    // Debit from sender
-    await withdrawFromUser(input.senderUserId, input.amount);
+  await transactionRepository.updateStatus(transaction.id, 'processing');
 
-    // Credit to receiver
-    await depositToUser(input.receiverUserId, input.amount);
+  const sagaContext: TransferSagaContext = {
+    transactionId: transaction.id,
+    senderUserId: input.senderUserId,
+    receiverUserId: input.receiverUserId,
+    amount: input.amount,
+    withdrawCompleted: false,
+    depositCompleted: false,
+  };
 
+  const saga = createTransferSaga();
+  const result = await saga.execute(sagaContext);
+
+  if (result.success) {
     await transactionRepository.updateStatus(transaction.id, 'completed');
 
     const completedTransaction: Transaction = {
@@ -94,23 +99,65 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
 
     eventService.publishTransactionCompleted(completedTransaction);
 
+    logger.info('Transaction completed successfully', {
+      transactionId: transaction.id,
+      steps: result.completedSteps,
+    });
+
     return completedTransaction;
-  } catch (error) {
-    // If transfer fails, mark transaction as failed
-    await transactionRepository.updateStatus(transaction.id, 'failed');
-
-    const failedTransaction: Transaction = {
-      ...transaction,
-      status: 'failed',
-    };
-
-    eventService.publishTransactionFailed(
-      failedTransaction,
-      error instanceof Error ? error.message : 'Transfer failed',
-    );
-
-    throw error;
   }
+
+  const hasCompletedSteps = result.completedSteps.length > 0;
+  const compensationFailed = hasCompensationFailures(result.compensationResults);
+  const errorMessage = result.error?.message ?? 'Transfer failed';
+
+  let finalStatus: 'failed' | 'reversed';
+  let errorCode: string;
+
+  if (!hasCompletedSteps) {
+    finalStatus = 'failed';
+    errorCode = 'TRANSFER_FAILED';
+  } else if (compensationFailed) {
+    finalStatus = 'failed';
+    errorCode = 'COMPENSATION_FAILED';
+  } else {
+    finalStatus = 'reversed';
+    errorCode = 'TRANSFER_FAILED';
+  }
+
+  await transactionRepository.updateStatus(transaction.id, finalStatus, errorMessage, errorCode);
+
+  const failedTransaction: Transaction = {
+    ...transaction,
+    status: finalStatus,
+    errorMessage,
+    errorCode,
+  };
+
+  if (compensationFailed) {
+    logger.error('Transaction failed with compensation errors', {
+      transactionId: transaction.id,
+      failedStep: result.failedStep,
+      compensationResults: result.compensationResults,
+    });
+  } else if (hasCompletedSteps) {
+    logger.warn('Transaction failed but compensation successful', {
+      transactionId: transaction.id,
+      failedStep: result.failedStep,
+      compensatedSteps: result.compensationResults?.filter(r => r.success).map(r => r.stepName),
+    });
+
+    eventService.publishTransactionReversed(failedTransaction);
+  } else {
+    logger.error('Transaction failed at first step', {
+      transactionId: transaction.id,
+      failedStep: result.failedStep,
+    });
+  }
+
+  eventService.publishTransactionFailed(failedTransaction, errorMessage, errorCode);
+
+  throw AppError.internal(errorMessage);
 }
 
 export async function getTransactionById(id: string): Promise<Transaction> {

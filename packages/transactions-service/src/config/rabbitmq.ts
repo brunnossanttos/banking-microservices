@@ -14,6 +14,7 @@ export const QUEUES = {
   TRANSACTION_CREATED: 'transaction.created',
   TRANSACTION_COMPLETED: 'transaction.completed',
   TRANSACTION_FAILED: 'transaction.failed',
+  TRANSACTION_REVERSED: 'transaction.reversed',
   NOTIFICATION_SEND: 'notification.send',
 } as const;
 
@@ -21,6 +22,7 @@ export const ROUTING_KEYS = {
   TRANSACTION_CREATED: 'transaction.created',
   TRANSACTION_COMPLETED: 'transaction.completed',
   TRANSACTION_FAILED: 'transaction.failed',
+  TRANSACTION_REVERSED: 'transaction.reversed',
   USER_BALANCE_UPDATED: 'user.balance.updated',
 } as const;
 
@@ -35,6 +37,7 @@ export async function connectRabbitMQ(): Promise<void> {
     await channel.assertQueue(QUEUES.TRANSACTION_CREATED, { durable: true });
     await channel.assertQueue(QUEUES.TRANSACTION_COMPLETED, { durable: true });
     await channel.assertQueue(QUEUES.TRANSACTION_FAILED, { durable: true });
+    await channel.assertQueue(QUEUES.TRANSACTION_REVERSED, { durable: true });
     await channel.assertQueue(QUEUES.NOTIFICATION_SEND, { durable: true });
 
     await channel.bindQueue(
@@ -51,6 +54,11 @@ export async function connectRabbitMQ(): Promise<void> {
       QUEUES.TRANSACTION_FAILED,
       EXCHANGES.TRANSACTIONS,
       ROUTING_KEYS.TRANSACTION_FAILED,
+    );
+    await channel.bindQueue(
+      QUEUES.TRANSACTION_REVERSED,
+      EXCHANGES.TRANSACTIONS,
+      ROUTING_KEYS.TRANSACTION_REVERSED,
     );
 
     logger.info('RabbitMQ connected successfully');

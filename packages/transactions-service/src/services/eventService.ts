@@ -108,6 +108,27 @@ export function publishTransactionFailed(
   return published;
 }
 
+export function publishTransactionReversed(transaction: Transaction): boolean {
+  const event: TransactionEvent = {
+    ...createBaseEvent('transaction.reversed'),
+    eventType: 'transaction.reversed',
+    payload: {
+      transactionId: transaction.id,
+      senderUserId: transaction.senderUserId,
+      receiverUserId: transaction.receiverUserId,
+      amount: transaction.amount,
+      fee: transaction.fee,
+      description: transaction.description,
+      type: transaction.type,
+      status: 'reversed',
+    },
+  };
+
+  logger.info('Publishing transaction.reversed event', { transactionId: transaction.id });
+
+  return publishMessage(EXCHANGES.TRANSACTIONS, ROUTING_KEYS.TRANSACTION_REVERSED, event);
+}
+
 function publishTransactionNotification(
   transaction: Transaction,
   template: NotificationTemplate,
@@ -150,6 +171,8 @@ export function publishTransactionEvent(
       return publishTransactionCompleted(transaction);
     case 'transaction.failed':
       return publishTransactionFailed(transaction, errorInfo?.message, errorInfo?.code);
+    case 'transaction.reversed':
+      return publishTransactionReversed(transaction);
     default:
       logger.warn('Unknown transaction event type', { eventType });
       return false;
