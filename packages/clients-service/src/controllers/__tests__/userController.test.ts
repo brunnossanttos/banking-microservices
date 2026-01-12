@@ -71,11 +71,7 @@ describe('userController', () => {
       mockReq.body = validInput;
       mockedUserService.createUser.mockResolvedValue(createdUser);
 
-      await userController.create(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.create(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedUserService.createUser).toHaveBeenCalledWith(validInput);
       expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.CREATED);
@@ -92,11 +88,7 @@ describe('userController', () => {
       mockReq.body = validInput;
       mockedUserService.createUser.mockResolvedValue(createdUser);
 
-      await userController.create(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.create(mockReq as Request, mockRes as Response, mockNext);
 
       const jsonCall = (mockRes.json as jest.Mock).mock.calls[0][0];
       expect(() => new Date(jsonCall.timestamp).toISOString()).not.toThrow();
@@ -107,11 +99,7 @@ describe('userController', () => {
       const error = new Error('Service error');
       mockedUserService.createUser.mockRejectedValue(error);
 
-      await userController.create(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.create(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -142,11 +130,7 @@ describe('userController', () => {
       mockReq.params = { userId: 'uuid-123' };
       mockedUserService.getUserById.mockResolvedValue(existingUser);
 
-      await userController.getById(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.getById(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedUserService.getUserById).toHaveBeenCalledWith('uuid-123');
       expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
@@ -163,11 +147,7 @@ describe('userController', () => {
       const error = new Error('User not found');
       mockedUserService.getUserById.mockRejectedValue(error);
 
-      await userController.getById(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.getById(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -181,11 +161,7 @@ describe('userController', () => {
       mockReq.body = { name: 'New Name' };
       mockedUserService.updateUser.mockResolvedValue(undefined);
 
-      await userController.update(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.update(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedUserService.updateUser).toHaveBeenCalledWith('uuid-123', { name: 'New Name' });
       expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
@@ -203,11 +179,7 @@ describe('userController', () => {
       const error = new Error('Update failed');
       mockedUserService.updateUser.mockRejectedValue(error);
 
-      await userController.update(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.update(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -221,11 +193,7 @@ describe('userController', () => {
       mockReq.body = { profilePictureUrl: 'https://example.com/photo.jpg' };
       mockedUserService.updateProfilePicture.mockResolvedValue(undefined);
 
-      await userController.updateProfilePicture(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.updateProfilePicture(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedUserService.updateProfilePicture).toHaveBeenCalledWith(
         'uuid-123',
@@ -246,11 +214,7 @@ describe('userController', () => {
       const error = new Error('Update failed');
       mockedUserService.updateProfilePicture.mockRejectedValue(error);
 
-      await userController.updateProfilePicture(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.updateProfilePicture(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -282,11 +246,7 @@ describe('userController', () => {
       mockReq.body = { amount: 500 };
       mockedUserService.deposit.mockResolvedValue(updatedUser);
 
-      await userController.deposit(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.deposit(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedUserService.deposit).toHaveBeenCalledWith('uuid-123', 500);
       expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
@@ -308,11 +268,7 @@ describe('userController', () => {
       const error = new Error('Deposit failed');
       mockedUserService.deposit.mockRejectedValue(error);
 
-      await userController.deposit(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.deposit(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -344,11 +300,7 @@ describe('userController', () => {
       mockReq.body = { amount: 500 };
       mockedUserService.withdraw.mockResolvedValue(updatedUser);
 
-      await userController.withdraw(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.withdraw(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockedUserService.withdraw).toHaveBeenCalledWith('uuid-123', 500);
       expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK);
@@ -370,11 +322,7 @@ describe('userController', () => {
       const error = new Error('Withdrawal failed');
       mockedUserService.withdraw.mockRejectedValue(error);
 
-      await userController.withdraw(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext,
-      );
+      await userController.withdraw(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(error);
       expect(mockRes.status).not.toHaveBeenCalled();

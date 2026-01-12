@@ -102,12 +102,12 @@ describe('authService', () => {
     it('should throw error when user not found', async () => {
       mockedUserRepository.findByEmailWithPassword.mockResolvedValue(null);
 
-      await expect(authService.login('nonexistent@example.com', 'password123')).rejects.toMatchObject(
-        {
-          statusCode: 401,
-          message: 'Invalid credentials',
-        },
-      );
+      await expect(
+        authService.login('nonexistent@example.com', 'password123'),
+      ).rejects.toMatchObject({
+        statusCode: 401,
+        message: 'Invalid credentials',
+      });
     });
 
     it('should throw error when password is invalid', async () => {

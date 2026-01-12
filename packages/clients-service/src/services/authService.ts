@@ -136,7 +136,7 @@ export async function logoutAll(userId: string): Promise<number> {
   return revokedCount;
 }
 
-export async function verifyAccessToken(token: string): Promise<JwtPayload> {
+export function verifyAccessToken(token: string): JwtPayload {
   try {
     const decoded = jwt.verify(token, env.jwt.secret) as JwtPayload;
     return decoded;
